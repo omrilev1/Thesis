@@ -4,17 +4,17 @@ addpath(genpath('..\Utils'))
 % We calculate the R(D) For constant dither , and then average and plot
 % for the random dither case
 
-% Run Parameters : 
+% Run Parameters :
 % Signal Variance is 1 , but the distribution can be set as input
 
 clear ; close all; clc;
 
-pdfType = {'Gaussian'}; % 'Exp' , 'Uniform' , 'PAM'
+pdfType = {'Gaussian','Laplace','Exp'}; % 'Exp' , 'Gaussian' , 'Laplace'
 n = 1; % Lattice dimension
 nPoints = 5;
 DeltaVec = [0.05:0.05:nPoints];
 variance = 1;
-ditherLength = 40;
+ditherLength = 100;
 
 avgH = zeros(length(pdfType),length(DeltaVec));
 avgDist = zeros(length(pdfType),length(DeltaVec));
@@ -24,22 +24,31 @@ currDist = zeros(length(pdfType),ditherLength,length(DeltaVec));
 
 for i=1:length(pdfType)
     for j=1:length(DeltaVec)
-    
+        
+        [pdf,cordX,cordY,dx] = pdfGenerator(pdfType(i),variance,n);
         Delta = DeltaVec(j);
-        
-        dither = linspace(-Delta/2,Delta/2,ditherLength);
-
-        effectiveLength = ceil(5*sqrt(variance) / Delta);
-        % make number of Delta segments odd 
-        if mod(effectiveLength,2) == 0
-            effectiveLength = effectiveLength + 1;
+        if min(cordX >= 0)
+            dither = linspace(-1*Delta/2,Delta/2,ditherLength);
+            
+            effectiveLength = ceil(7*sqrt(variance) / Delta);
+            % make number of Delta segments odd
+            if mod(effectiveLength,2) == 0
+                effectiveLength = effectiveLength + 1;
+            end
+            codebook  = [Delta/2 Delta/2 : Delta : (effectiveLength+0.5)*Delta];
+            partition = 0 : Delta : effectiveLength*Delta;
+        else
+            dither = linspace(-Delta/2,Delta/2,ditherLength);
+            
+            effectiveLength = ceil(7*sqrt(variance) / Delta);
+            % make number of Delta segments odd
+            if mod(effectiveLength,2) == 0
+                effectiveLength = effectiveLength + 1;
+            end
+            
+            codebook = -((effectiveLength+1)/2)*Delta : Delta : ((effectiveLength+1)/2)*Delta;
+            partition = -((effectiveLength-1)/2)*Delta - Delta/2 : Delta : ((effectiveLength-1)/2)*Delta + Delta/2;
         end
-        
-        codebook = -((effectiveLength+1)/2)*Delta : Delta : ((effectiveLength+1)/2)*Delta;
-        partition = -((effectiveLength-1)/2)*Delta - Delta/2 : Delta : ((effectiveLength-1)/2)*Delta + Delta/2;
-        
-        [pdf,cordX,cordY,dx] = pdfGenerator(pdfType,variance,n);
-        
         for k=1 : length(dither)
             % quantize distribution and calculate the probabilites : Pr{s+u in lambda}
             quantIndex = quantiz(cordX + dither(k),partition,codebook);
@@ -49,11 +58,12 @@ for i=1:length(pdfType)
             for valIdx = 1 : length(segmentsVal)
                 quantSegment = (quantIndex == segmentsVal(valIdx));
                 prob = sum(pdf(quantSegment))*dx;
-                currDist(i,k,j) = currDist(i,k,j) + dx*sum(pdf(quantSegment) .* (cordX(quantSegment) + dither(k) - codebook(valIdx)).^2);
+%                 currDist(i,k,j) = currDist(i,k,j) + dx*sum(pdf(quantSegment) .* (cordX(quantSegment) + dither(k) - codebook(valIdx)).^2);
+                currDist(i,k,j) = currDist(i,k,j) + dx*sum(pdf(quantSegment) .* (cordX(quantSegment) - codebook(valIdx)).^2);
                 
-                if prob > 0 
+                if prob > 0
                     currH(i,k,j) = currH(i,k,j) - prob*log2(prob);
-                end 
+                end
             end
         end
         
@@ -64,39 +74,68 @@ for i=1:length(pdfType)
         avgDist(i,j) = sum(distForAvg)/ditherLength;
     end
 end
+deltaToPlot = 1:0.5:4;
+pdfToPlot = {'Gaussian','Laplace','Exp'};
+[indices] = resultPlot(deltaToPlot,DeltaVec,pdfType,pdfToPlot,currH,currDist);
 
-% relevant Delta Indices 
-idx_1 = find(DeltaVec == 1);
-idx_2 = find(DeltaVec == 2);
-idx_25 = find(DeltaVec == 2.5);
-idx_3 = find(DeltaVec == 3);
-idx_35 = find(DeltaVec == 3.5);
-idx_4 = find(DeltaVec == 4);
-idx_5 = find(DeltaVec == 5);
+function [indices] = resultPlot(deltaToPlot,deltaVec,pdfToPlot,pdfVec,H,D)
+
+% R(D) Shannon curve
+shannonD = 0.001:0.001:1;
+Rd = 0.5*log(1./shannonD);
+
+% Calculate the Avg over the dither
+avgH = reshape(mean(H,2),size(H,1),[]);
+avgDist = reshape(mean(D,2),size(D,1),[]);
+
+% find Delta's indices in the delta vector
+indices = zeros(1,length(deltaToPlot));
+for i=1:length(deltaToPlot)
+    [~,indices(i)] = min(abs(deltaVec - deltaToPlot(i)));
+end
+
+% find the convex hull of the R(D) Curve
+pdfIdx = zeros(1,length(pdfToPlot));
+currTitle = [];
+for i=1:length(pdfToPlot)
+    for j=1:length(pdfVec)
+        count = 1;
+        if strcmp(pdfVec(j),pdfToPlot(i))
+            pdfIdx(i) = count;
+            break;
+        else
+            count = count + 1;
+        end
+    end
+    currTitle = [currTitle pdfToPlot(i)];
+end
+
+for i=1:length(pdfToPlot)
+
+    % convex hull of R(D|U)
+    currH = reshape(H(i,:,:),1,[]);
+    currD = reshape(D(i,:,:),1,[]);
+    convHull_Idx = convhull(currD,currH);
+    
+    figure; hold all
+    plot(shannonD,Rd,'-','LineWidth',1.5)
+    plot(currD(convHull_Idx),currH(convHull_Idx),'-p')
+    plot(avgDist(i,:),avgH(i,:),'-','LineWidth',1.5)
+    currLegend = {'Shannon : R(D) = 0.5*log(1/D)','Optimum Dither Convex Hull','ECDQ'};
+    for j=1:length(deltaToPlot)
+        plot(D(i,:,indices(j)),H(i,:,indices(j)),'--','LineWidth',1.7)
+        currLegend = [currLegend strcat('\Delta =',num2str(deltaToPlot(j)))];
+    end
+    grid on; grid minor;
+    xlabel('D'); ylabel('R [bits]')
+    legend(currLegend);
+    title(currTitle(i));
+    
+    xlim([0 2]); ylim([0 3.5])
+end
+end
 
 
 
-D = 0.001:0.001:1;
-Rd = 0.5*log(1./D);
-figure; hold all
-plot(D,Rd,'-','LineWidth',1.5)
-plot(avgDist,avgH,'-','LineWidth',1.5)
-plot(currDist(1,:,idx_1),currH(1,:,idx_1),'--','LineWidth',1.7)
-plot(currDist(1,:,idx_2),currH(1,:,idx_2),'--','LineWidth',1.7)
-plot(currDist(1,:,idx_25),currH(1,:,idx_25),'--','LineWidth',1.7)
-plot(currDist(1,:,idx_3),currH(1,:,idx_3),'--','LineWidth',1.7)
-plot(currDist(1,:,idx_35),currH(1,:,idx_35),'--','LineWidth',1.7)
-plot(currDist(1,:,idx_4),currH(1,:,idx_4),'--','LineWidth',1.7)
-plot(currDist(1,:,idx_5),currH(1,:,idx_5),'--','LineWidth',1.7)
-grid on; grid minor;
-xlabel('D'); ylabel('R [bits]')
-title('Distortion Vs Rate : Shannon and ECDQ')
-legend('Shannon','ECDQ','\Delta = 1','\Delta = 2','\Delta = 2.5','\Delta = 3','\Delta = 3.5','\Delta = 4','\Delta = 5')
-
-xlim([0 2]); ylim([0 3.5])
 
 
-
-        
-        
-            

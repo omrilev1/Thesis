@@ -19,6 +19,14 @@ elseif  strcmp(Type, 'Exp')
     lambda = 1/sqrt(variance);
     tempPDF = dx*(lambda)^2 * exp(-1*(lambda*gridX + lambda*gridY));
     
+elseif  strcmp(Type, 'Laplace')
+    
+    baseCord = linspace(-8*sqrt(variance),8*sqrt(variance),1e3);
+    dx = 2*8*sqrt(variance) / 1e3;
+    [gridX,gridY] = meshgrid(baseCord,baseCord);
+    
+    b = sqrt(variance/2);
+    tempPDF = dx*(((1/(2*b)))^2)* exp(-1*(abs(gridX)/b + abs(gridY)/b));    
 elseif strcmp(Type, 'Unifrom')
     
     baseCord = linspace(-8*sqrt(variance),8*sqrt(variance),1e3);
