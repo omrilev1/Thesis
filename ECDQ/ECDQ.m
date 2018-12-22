@@ -10,11 +10,10 @@ addpath(genpath('..\Utils'))
 clear ; close all; clc;
 
 pdfType = {'Gaussian','Laplace','Exp'}; % 'Exp' , 'Gaussian' , 'Laplace'
-n = 1; % Lattice dimension
 nPoints = 5;
-DeltaVec = [0.05:0.05:nPoints];
+DeltaVec = 0.05:0.05:nPoints;
 variance = 1;
-ditherLength = 100;
+ditherLength = 120;
 
 avgH = zeros(length(pdfType),length(DeltaVec));
 avgDist = zeros(length(pdfType),length(DeltaVec));
@@ -25,18 +24,20 @@ currDist = zeros(length(pdfType),ditherLength,length(DeltaVec));
 for i=1:length(pdfType)
     for j=1:length(DeltaVec)
         
-        [pdf,cordX,cordY,dx] = pdfGenerator(pdfType(i),variance,n);
+        [pdf,cordX,cordY,dx] = pdfGenerator(pdfType(i),variance,1);
         Delta = DeltaVec(j);
         if min(cordX >= 0)
             dither = linspace(-1*Delta/2,Delta/2,ditherLength);
             
-            effectiveLength = ceil(7*sqrt(variance) / Delta);
+            effectiveLength = ceil(9*sqrt(variance) / Delta);
             % make number of Delta segments odd
             if mod(effectiveLength,2) == 0
                 effectiveLength = effectiveLength + 1;
             end
-            codebook  = [Delta/2 Delta/2 : Delta : (effectiveLength+0.5)*Delta];
-            partition = 0 : Delta : effectiveLength*Delta;
+%             codebook  = [Delta/2 Delta/2 : Delta : (effectiveLength+0.5)*Delta];
+%             partition = 0 : Delta : effectiveLength*Delta;
+            codebook  = 0  : Delta : effectiveLength*Delta;
+            partition = Delta/2 : Delta : effectiveLength*Delta;
         else
             dither = linspace(-Delta/2,Delta/2,ditherLength);
             
@@ -58,8 +59,7 @@ for i=1:length(pdfType)
             for valIdx = 1 : length(segmentsVal)
                 quantSegment = (quantIndex == segmentsVal(valIdx));
                 prob = sum(pdf(quantSegment))*dx;
-%                 currDist(i,k,j) = currDist(i,k,j) + dx*sum(pdf(quantSegment) .* (cordX(quantSegment) + dither(k) - codebook(valIdx)).^2);
-                currDist(i,k,j) = currDist(i,k,j) + dx*sum(pdf(quantSegment) .* (cordX(quantSegment) - codebook(valIdx)).^2);
+                currDist(i,k,j) = currDist(i,k,j) + dx*sum(pdf(quantSegment) .* (codebook(valIdx) - (cordX(quantSegment) + dither(k))).^2);
                 
                 if prob > 0
                     currH(i,k,j) = currH(i,k,j) - prob*log2(prob);
@@ -74,7 +74,8 @@ for i=1:length(pdfType)
         avgDist(i,j) = sum(distForAvg)/ditherLength;
     end
 end
-deltaToPlot = 1:0.5:4;
+
+deltaToPlot = 1:1:4;
 pdfToPlot = {'Gaussian','Laplace','Exp'};
 [indices] = resultPlot(deltaToPlot,DeltaVec,pdfType,pdfToPlot,currH,currDist);
 
@@ -94,7 +95,7 @@ for i=1:length(deltaToPlot)
     [~,indices(i)] = min(abs(deltaVec - deltaToPlot(i)));
 end
 
-% find the convex hull of the R(D) Curve
+% Figure titles
 pdfIdx = zeros(1,length(pdfToPlot));
 currTitle = [];
 for i=1:length(pdfToPlot)
@@ -110,6 +111,7 @@ for i=1:length(pdfToPlot)
     currTitle = [currTitle pdfToPlot(i)];
 end
 
+% iterate over the distributions and plot the resulting curves
 for i=1:length(pdfToPlot)
 
     % convex hull of R(D|U)
