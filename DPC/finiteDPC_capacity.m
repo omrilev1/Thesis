@@ -113,14 +113,14 @@ for i=1:length(pam)
         % calculate channel output distribution
         if i==1
             % calculate equivalent noise for the DPC case alpha*X + (1-alpha)*N where alpha = (SNR/(SNR+1))
-            alpha = snrLin(j)/(1+snrLin(j));
-            alphaTimesNoise = (1/alpha)*(1/sqrt(2*pi*sigma^2)) * exp(-0.5*(xAxis.^2)/((alpha^2)*(sigma^2)));
-            alphaTimesInput = zeros(size(xAxis));
-            alphaTimesInput(xAxis >= -1*Delta*(1-alpha) & xAxis <= Delta*(1-alpha)) = 1/(2*Delta*(1-alpha));
+%             alpha = snrLin(j)/(1+snrLin(j));
+%             alphaTimesNoise = (1/alpha)*(1/sqrt(2*pi*sigma^2)) * exp(-0.5*(xAxis.^2)/((alpha^2)*(sigma^2)));
+%             alphaTimesInput = zeros(size(xAxis));
+%             alphaTimesInput(xAxis >= -1*Delta*(1-alpha) & xAxis <= Delta*(1-alpha)) = 1/(2*Delta*(1-alpha));
             
-            equivNoiseDPC = conv(alphaTimesNoise,alphaTimesInput) * dX;
+            equivNoiseDPC = (1/sqrt(2*pi*sigma^2)) * exp(-0.5*(xAxisForModulo.^2)/(sigma^2)); % conv(alphaTimesNoise,alphaTimesInput) * dX;
             
-            
+           
             % regulat uniform input in awgn channel
             yDist = conv(noiseDist,uniformDist) * dX;
             
@@ -200,11 +200,28 @@ plot(snri,capacity_UNI,'-o','LineWidth',1.6);
 plot(snri,capacity_UNI_FiniteDPC,'-p','LineWidth',1.6);
 plot(snri,capacity_UNI_DPC,'-^','LineWidth',1.6);
 plot(snri,lowerBound,'--','LineWidth',1.6);
-plot(snri,upperBound,'--','LineWidth',1.6);
 set(gca,'FontSize', 12, 'FontName', 'Times New Roman');
 grid on; grid minor;
 box on;
 xlabel('SNR (Es/N0) dB','FontSize', 14, 'FontName', 'Times New Roman');
+ylabel('Capacity (bits/Tx)','FontSize',14,'FontName', 'Times New Roman');
+
+legend('Gaussian Capacity', 'Gaussian Capacity Uniform Input', ...
+    'Finite Power DPC uniform interferer and input I(v;Y)','Regular DPC - Uniform Input',...
+    'Finite DPC - Lower Bound','Finite DPC - Upper Bound');
+title('Capacity for AWGN , With uniform interferer');
+
+% Bounds and awgn Capacity
+figure;hold all
+plot(10*log10(snrLin./(2*GaussianCapacity)),GaussianCapacity,'-*','LineWidth',1.6);
+plot(10*log10(snrLin./(2*capacity_UNI)),capacity_UNI,'-o','LineWidth',1.6);
+plot(10*log10(snrLin./(2*capacity_UNI_FiniteDPC)),capacity_UNI_FiniteDPC,'-p','LineWidth',1.6);
+plot(10*log10(snrLin./(2*capacity_UNI_DPC)),capacity_UNI_DPC,'-^','LineWidth',1.6);
+plot(10*log10(snrLin./(2*lowerBound)),lowerBound,'--','LineWidth',1.6);
+set(gca,'FontSize', 12, 'FontName', 'Times New Roman');
+grid on; grid minor;
+box on;
+xlabel('E_b / N_0 [dB]','FontSize', 14, 'FontName', 'Times New Roman');
 ylabel('Capacity (bits/Tx)','FontSize',14,'FontName', 'Times New Roman');
 
 legend('Gaussian Capacity', 'Gaussian Capacity Uniform Input', ...
