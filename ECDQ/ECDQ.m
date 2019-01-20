@@ -1,13 +1,13 @@
 addpath(genpath('..\Utils'))
 
-%% This Script Calculate the R(D) Curve for ECDQ scheme
+%% This Script Calculate the R(D) Curve for ECDQ scheme - 1D case
 % We calculate the R(D) For constant dither , and then average and plot
 % for the random dither case
 
 % Run Parameters :
 % Signal Variance is 1 , but the distribution can be set as input
 
-clear ; close all; clc;
+clear ; clc;
 
 pdfType = {'Gaussian','Laplace','Exp'}; % 'Exp' , 'Gaussian' , 'Laplace'
 nPoints = 5;
@@ -34,8 +34,6 @@ for i=1:length(pdfType)
             if mod(effectiveLength,2) == 0
                 effectiveLength = effectiveLength + 1;
             end
-%             codebook  = [Delta/2 Delta/2 : Delta : (effectiveLength+0.5)*Delta];
-%             partition = 0 : Delta : effectiveLength*Delta;
             codebook  = 0  : Delta : effectiveLength*Delta;
             partition = Delta/2 : Delta : effectiveLength*Delta;
         else

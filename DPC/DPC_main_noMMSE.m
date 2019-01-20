@@ -8,7 +8,7 @@ clc; clear ; close all;
 snri = (-10:1:28);
 snrLin = 10.^(snri/10);
 inputType = {'uni'}; % [2,4,8,16,32,64];
-toUseMMSE = [0 , 1];
+toUseMMSE = [0];
 
 dX = 1e-4; % for numeric calculations
 

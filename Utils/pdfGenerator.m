@@ -4,16 +4,16 @@ function [f,cordX,cordY,dx] = pdfGenerator(Type,variance,n)
 
 if strcmp(Type, 'Gaussian')
     
-    baseCord = linspace(-8*sqrt(variance),8*sqrt(variance),1e3);
-    dx = 2*8*sqrt(variance) / 1e3;
+    baseCord = linspace(-8*sqrt(variance),8*sqrt(variance),4e2);
+    dx = 2*8*sqrt(variance) / 4e2;
     [gridX,gridY] = meshgrid(baseCord,baseCord);
     
     tempPDF = dx*(1/sqrt(2*pi*variance))^2 * exp(-1*(gridX.^2 + gridY.^2)/(2*variance));
     
 elseif  strcmp(Type, 'Exp')
     
-    baseCord = linspace(0,8*sqrt(variance),1e3);
-    dx = 8*sqrt(variance) / 1e3;
+    baseCord = linspace(0,8*sqrt(variance),4e2);
+    dx = 8*sqrt(variance) / 4e2;
     [gridX,gridY] = meshgrid(baseCord,baseCord);
     
     lambda = 1/sqrt(variance);
@@ -21,16 +21,16 @@ elseif  strcmp(Type, 'Exp')
     
 elseif  strcmp(Type, 'Laplace')
     
-    baseCord = linspace(-8*sqrt(variance),8*sqrt(variance),1e3);
-    dx = 2*8*sqrt(variance) / 1e3;
+    baseCord = linspace(-8*sqrt(variance),8*sqrt(variance),4e2);
+    dx = 2*8*sqrt(variance) / 4e2;
     [gridX,gridY] = meshgrid(baseCord,baseCord);
     
     b = sqrt(variance/2);
     tempPDF = dx*(((1/(2*b)))^2)* exp(-1*(abs(gridX)/b + abs(gridY)/b));    
 elseif strcmp(Type, 'Unifrom')
     
-    baseCord = linspace(-8*sqrt(variance),8*sqrt(variance),1e3);
-    dx = 2*8*sqrt(variance) / 1e3;
+    baseCord = linspace(-8*sqrt(variance),8*sqrt(variance),4e2);
+    dx = 2*8*sqrt(variance) / 4e2;
     [gridX,gridY] = meshgrid(baseCord,baseCord);
     
     Delta = sqrt(3*variance);
