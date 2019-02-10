@@ -10,10 +10,10 @@ addpath(genpath('..\Utils'))
 clear ; close all; clc;
 
 pdfType = {'Gaussian','Laplace','Exp'}; % 'Exp' , 'Gaussian' , 'Laplace'
-nPoints = 5;
-DeltaVec = 0.05:0.25:nPoints;
+nPoints = 4;
+DeltaVec = 1:0.25:nPoints;
 variance = 0.25;
-ditherLength = 500; effectiveDitherLength = ditherLength;
+ditherLength = 3e3; effectiveDitherLength = ditherLength;
 
 avgH = zeros(length(pdfType),length(DeltaVec));
 avgDist = zeros(length(pdfType),length(DeltaVec));
@@ -36,7 +36,7 @@ for i=1:length(pdfType)
         Delta = DeltaVec(j);
         
         % generate 2D dither
-        dither = generate2D_dither(Delta,50*ditherLength,2,Delta*basic_latticePoints);
+        dither = generate2D_dither(Delta,ditherLength,2,Delta*basic_latticePoints);
         
         % generate 2D lattice points (codebook)
         latticePoints = Delta*basic_latticePoints;
@@ -68,7 +68,8 @@ for i=1:length(pdfType)
                 XY_plusDither = valid_XY + dither(:,k);
                 total_Error = latticePoints_temp(:,1,segmentsVal(valIdx)) - XY_plusDither ;
                 
-                errorNorm = sqrt((total_Error(1,:)).^2 + (total_Error(2,:)).^2);
+%                 errorNorm = sqrt((total_Error(1,:)).^2 + (total_Error(2,:)).^2);
+                errorNorm = ((total_Error(1,:)).^2 + (total_Error(2,:)).^2)/2;
                 
                 total_Error2D = zeros(size(pdf));
                 total_Error2D(indx_2D) = errorNorm;
@@ -91,15 +92,11 @@ for i=1:length(pdfType)
     end
 end
 
-deltaToPlot = 1:1:5;
+deltaToPlot = 1:1:4;
 pdfToPlot = {'Gaussian','Laplace','Exp'};
 [indices] = resultPlot(deltaToPlot,DeltaVec,pdfType,pdfToPlot,currH,currDist,ditherLength);
 
 function [indices] = resultPlot(deltaToPlot,deltaVec,pdfToPlot,pdfVec,H,D,ditherLength)
-
-% R(D) Shannon curve
-shannonD = 0.001:0.001:1;
-Rd = 0.5*log(0.25./shannonD);
 
 % Calculate the Avg over the dither
 avgH = reshape(mean(H,2),size(H,1),[]);
@@ -130,6 +127,16 @@ end
 % iterate over the distributions and plot the resulting curves
 for i=1:length(pdfToPlot)
     
+    if strcmp(pdfToPlot,'Gaussian')
+        % R(D) Shannon curve
+        shannonD = 0.001:0.001:1;
+        Rd = max(0.5*log(0.25./shannonD),0);
+    else
+        % R(D) Shannon curve
+        shannonD = 0.001:0.001:1;
+        lambda = 1/sqrt(0.25);
+        Rd = max(-0.5*log(lambda*shannonD),0);
+    end
     % convex hull of R(D|U)
     currH = reshape(H(i,:,:),1,[]);
     currD = reshape(D(i,:,:),1,[]);

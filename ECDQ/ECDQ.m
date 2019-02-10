@@ -1,3 +1,5 @@
+close all; clear all; clc;
+
 addpath(genpath('..\Utils'))
 
 %% This Script Calculate the R(D) Curve for ECDQ scheme - 1D case
@@ -79,10 +81,6 @@ pdfToPlot = {'Gaussian','Laplace','Exp'};
 
 function [indices] = resultPlot(deltaToPlot,deltaVec,pdfToPlot,pdfVec,H,D,ditherLength)
 
-% R(D) Shannon curve
-shannonD = 0.001:0.001:1;
-Rd = 0.5*log(1./shannonD);
-
 % Calculate the Avg over the dither
 avgH = reshape(mean(H,2),size(H,1),[]);
 avgDist = reshape(mean(D,2),size(D,1),[]);
@@ -111,20 +109,31 @@ end
 
 % iterate over the distributions and plot the resulting curves
 for i=1:length(pdfToPlot)
-
+    
+    if strcmp(pdfToPlot(i),'Gaussian')
+        % R(D) Shannon curve
+        shannonD = 0.001:0.001:1;
+        Rd = max(0.5*log(1./shannonD),0);
+    else
+        % R(D) Shannon curve
+        shannonD = 0.001:0.001:1;
+        lambda = 1;
+        Rd = max(-0.5*log(lambda*shannonD),0);
+    end
+    
     % convex hull of R(D|U)
     currH = reshape(H(i,:,:),1,[]);
     currD = reshape(D(i,:,:),1,[]);
     convHull_Idx = convhull(currD,currH);
     
-    % take only the points on the relevant region 
+    % take only the points on the relevant region
     [~,relevant_ConvHull_Idx] = find(currD(convHull_Idx) < 2);
     convHull_Idx_ToPlot = convHull_Idx(relevant_ConvHull_Idx);
     
     % Plot
     figure; hold all
     plot(shannonD,Rd,'-','LineWidth',1.5)
-    plot(currD(convHull_Idx_ToPlot),currH(convHull_Idx_ToPlot),'-cp')
+    plot(currD(convHull_Idx_ToPlot),currH(convHull_Idx_ToPlot),'-kp')
     plot(avgDist(i,:),avgH(i,:),'-','LineWidth',1.5)
     currLegend = {'Shannon : R(D) = 0.5*log(1/D)','Optimum Dither Convex Hull','ECDQ'};
     for j=1:length(deltaToPlot)
@@ -137,7 +146,7 @@ for i=1:length(pdfToPlot)
     title(currTitle(i));
     
     xlim([0 2]); ylim([0 3.5])
-
+    
     % Plot the optimal Delta of the points on the convex hull
     [I,J] = ind2sub([size(H,2) size(H,3)],convHull_Idx_ToPlot);
     optimalDither = zeros(1,length(I));
@@ -150,7 +159,7 @@ for i=1:length(pdfToPlot)
     grid on; grid minor;
     xlabel('\Delta'); ylabel('dither/\Delta');
     title(strcat('optimal Dither Value - ',currTitle(i)));
-
+    
     
 end
 end

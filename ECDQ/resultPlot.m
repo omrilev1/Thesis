@@ -1,9 +1,5 @@
 function [indices] = resultPlot(deltaToPlot,deltaVec,pdfToPlot,pdfVec,H,D,ditherLength)
 
-% R(D) Shannon curve
-shannonD = 0.001:0.001:1;
-Rd = 0.5*log(0.25./shannonD);
-
 % Calculate the Avg over the dither
 avgH = reshape(mean(H,2),size(H,1),[]);
 avgDist = reshape(mean(D,2),size(D,1),[]);
@@ -33,6 +29,16 @@ end
 % iterate over the distributions and plot the resulting curves
 for i=1:length(pdfToPlot)
     
+    if strcmp(pdfToPlot(i),'Gaussian')
+        % R(D) Shannon curve
+        shannonD = 0.001:0.001:1;
+        Rd = max(0.5*log(0.25./shannonD),0);
+    else
+        % R(D) Shannon curve
+        shannonD = 0.001:0.001:1;
+        lambda = 1/0.25;
+        Rd = max(-0.5*log(lambda*shannonD),0);
+    end
     % convex hull of R(D|U)
     currH = reshape(H(i,:,:),1,[]);
     currD = reshape(D(i,:,:),1,[]);
@@ -45,10 +51,10 @@ for i=1:length(pdfToPlot)
     % Plot
     figure; hold all
     plot(shannonD,max(Rd,0),'-','LineWidth',1.5)
-%     plot(currD(convHull_Idx_ToPlot),currH(convHull_Idx_ToPlot)/2,'cp')
+%     plot(currD(convHull_Idx_ToPlot),currH(convHull_Idx_ToPlot)/2,'-cp')
     plot(avgDist(i,:),avgH(i,:)/2,'-','LineWidth',2)
 %     currLegend = {'Shannon : R(D) = 0.5*log(1/D)','Optimum Dither Convex Hull','ECDQ'};
-    currLegend = {'Shannon : R(D) = 0.5*log(1/D)','ECDQ'};
+    currLegend = {'R(D)','ECDQ'};
     
     curveStyle = ['ro';'ks';'cp';'mo';'gs'];
     for j=1:length(deltaToPlot)
@@ -63,17 +69,19 @@ for i=1:length(pdfToPlot)
 %     xlim([0 2]); ylim([0 3.5])
     
     % Plot the optimal Delta of the points on the convex hull
-%     [I,J] = ind2sub([size(H,2) size(H,3)],convHull_Idx_ToPlot);
-%     optimalDither = zeros(2,length(I));
-%     for k = 1 : length(I)
-%         currDither = generate2D_dither(deltaVec(J(k)),ditherLength);
-%         optimalDither(:,k) =  currDither(:,I(k))/deltaVec(J(k));
-%     end
-%     figure;
-%     plot3(optimalDither(1,:),optimalDither(2,:),deltaVec(J),'gp','LineWidth',1.5);
-%     grid on; grid minor;
-%     xlabel('\Delta'); ylabel('dither/\Delta');
-%     title(strcat('optimal Dither Value - ',currTitle(i)));
+    [I,J] = ind2sub([size(H,2) size(H,3)],convHull_Idx_ToPlot);
+    optimalDither = zeros(2,length(I));
+    for k = 1 : length(I)
+        G = [0 sqrt(3); 2 1];
+        basic_latticePoints = latticeGen(G,50);
+        currDither = generate2D_dither(deltaVec(J(k)),ditherLength,2,deltaVec(J(k))*basic_latticePoints);
+        optimalDither(:,k) =  currDither(:,I(k))/deltaVec(J(k));
+    end
+    figure;
+    plot3(optimalDither(1,:),optimalDither(2,:),deltaVec(J),'gp','LineWidth',1.5);
+    grid on; grid minor;
+    xlabel('\Delta'); ylabel('dither/\Delta');
+    title(strcat('optimal Dither Value - ',currTitle(i)));
     
     
 end
