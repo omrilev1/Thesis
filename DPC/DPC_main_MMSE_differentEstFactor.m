@@ -6,7 +6,7 @@ addpath(genpath('..\Utils'))
 % The script compare different alpha 
 clc; clear ; close all;
 %% data
-snri = 0;
+snri = -10;
 snrLin = 10.^(snri/10);
 alphaMMSE = snrLin/(1+snrLin);
 
@@ -68,7 +68,7 @@ for i=1:length(inputType)
         % AWGN with Zero Mean
         noiseDist = (1/sqrt(2*pi*sigma^2)) * exp(-0.5*(xAxis.^2)/(sigma^2));
         alphaTimesNoise = (1/alpha)*(1/sqrt(2*pi*sigma^2)) * exp(-0.5*(xAxis.^2)/((alpha^2)*(sigma^2)));
-        alphaMMSETimesNoise = (1/alphaMMSE)*(1/sqrt(2*pi*sigma^2)) * exp(-0.5*(xAxis.^2)/((alphaMMSE^2)*(sigma^2)));
+        alphaMMSETimesNoise = (1/alpha)*(1/sqrt(2*pi*sigma^2)) * exp(-0.5*(xAxis.^2)/((alpha^2)*(sigma^2)));% (1/alphaMMSE)*(1/sqrt(2*pi*sigma^2)) * exp(-0.5*(xAxis.^2)/((alphaMMSE^2)*(sigma^2)));
         
         % channel output distribution :
         
@@ -85,7 +85,8 @@ for i=1:length(inputType)
         yDist_FiniteDPC = yDist_FiniteDPC(floor(length(temp_yDist_FiniteDPC)/2) : end - floor(length(temp_yDist_FiniteDPC)/2));
         
         alphaTimesInput = zeros(size(xAxis));
-        alphaTimesInput(xAxis >= -1*Delta*(1-alphaMMSE) & xAxis <= Delta*(1-alphaMMSE)) = 1/(2*Delta*(1-alphaMMSE));
+        alphaTimesInput(xAxis >= -1*Delta*(1-alpha) & xAxis <= Delta*(1-alpha)) = 1/(2*Delta*(1-alpha));
+        % alphaTimesInput(xAxis >= -1*Delta*(1-alphaMMSE) & xAxis <= Delta*(1-alphaMMSE)) = 1/(2*Delta*(1-alphaMMSE));
         equivNoiseDPC = conv(alphaMMSETimesNoise,alphaTimesInput) * dX;
         equivNoiseDPC = equivNoiseDPC(ceil(length(alphaMMSETimesNoise)/2) : end - ceil(length(alphaMMSETimesNoise)/2));
         noiseDistDPC = sum(equivNoiseDPC(ModuloIndices),2);
@@ -150,6 +151,7 @@ end
 function [] = resultPlot(snr,alphaVec,capacity_AWGN,capacity_DPC,capacity_FiniteDPC,inputType)
 
 snrLin = 10.^(snr/10);
+alphaMMSE = snrLin/(1+snrLin);
 % AWGN Channel capacity
 GaussianCapacity = (0.5*log2(1+ snrLin)) * ones(size(alphaVec));
 
@@ -170,7 +172,7 @@ ylabel('Capacity (bits/Tx)','FontSize',14,'FontName', 'Times New Roman');
 
 legend('Gaussian Capacity', 'Gaussian Capacity Uniform Input', ...
     'DPC uniform interferer and input I(v;Y)','Finite Power DPC - Uniform Input');
-title(strcat('Uniform interferer , different alpha SNR = ',num2str(snr)));
+title(strcat('Uniform interferer , different alpha SNR = ',num2str(snr),'\n \alpha_{MMSE} = ',num2str(alphaMMSE)));
 
 end
 

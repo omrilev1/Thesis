@@ -10,17 +10,18 @@ addpath(genpath('.\results'))
 % LTE Turbo
 % 5G LDPC
 
-resultsFileName = strcat('.\results\',date,'HighPrecentOfDeletions_ConvCode_Results');
+resultsFileName = strcat('.\results\',date,'TurboIterations_Results');
 
 
 % Init Params
 convCode.constraintLength = [8,7];
-convCode.rate = [1/4 1/3 1/2];% [1/4 1/3 2/5 1/2];
+convCode.rate = [1/2];% [1/4 1/3 2/5 1/2];
 
 decoding_method = [1]; % 0 for LDPC in hard decision , 1 for soft
-dvb_rate = [9/10 5/6 3/4 2/3];%[9/10 5/6 3/4 2/3];
+dvb_rate = [2/5];%[9/10 5/6 3/4 2/3 2/5 ];
 
-percentDeletions = [0 0.05 0.1 0.2];
+percentDeletions = [0 0.1 0.2 0.3];
+turboIterations = [0,1,2,3];
 
 blockIntrlvDepth = 256;
 

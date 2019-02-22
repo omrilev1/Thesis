@@ -13,9 +13,12 @@ clear ; clc;
 
 pdfType = {'Gaussian','Laplace','Exp'}; % 'Exp' , 'Gaussian' , 'Laplace'
 nPoints = 5;
-DeltaVec = 0.05:0.05:nPoints;
+DeltaVec = [0.05:0.05:nPoints];
 variance = 1;
-ditherLength = 120;
+ditherLength = 240;
+
+zeroDitherH = zeros(length(pdfType),length(DeltaVec));
+zeroDitherDist = zeros(length(pdfType),length(DeltaVec));
 
 avgH = zeros(length(pdfType),length(DeltaVec));
 avgDist = zeros(length(pdfType),length(DeltaVec));
@@ -28,10 +31,12 @@ for i=1:length(pdfType)
         
         [pdf,cordX,cordY,dx] = pdfGenerator(pdfType(i),variance,1);
         Delta = DeltaVec(j);
+        
         if min(cordX >= 0)
-            dither = linspace(-1*Delta/2,Delta/2,ditherLength);
             
+            dither = linspace(-1*Delta/2,Delta/2,ditherLength);
             effectiveLength = ceil(9*sqrt(variance) / Delta);
+            
             % make number of Delta segments odd
             if mod(effectiveLength,2) == 0
                 effectiveLength = effectiveLength + 1;
@@ -40,7 +45,6 @@ for i=1:length(pdfType)
             partition = Delta/2 : Delta : effectiveLength*Delta;
         else
             dither = linspace(-Delta/2,Delta/2,ditherLength);
-            
             effectiveLength = ceil(7*sqrt(variance) / Delta);
             % make number of Delta segments odd
             if mod(effectiveLength,2) == 0
@@ -72,14 +76,18 @@ for i=1:length(pdfType)
         
         avgH(i,j) = sum(entropyForAvg)/ditherLength;
         avgDist(i,j) = sum(distForAvg)/ditherLength;
+        
+        [~,zeroDitherIdx] = min(abs(dither - 0));
+        zeroDitherH(i,j) = entropyForAvg(zeroDitherIdx);
+        zeroDitherDist(i,j) = distForAvg(zeroDitherIdx);
     end
 end
 
-deltaToPlot = 1:1:4;
+deltaToPlot = [1:1:4];
 pdfToPlot = {'Gaussian','Laplace','Exp'};
-[indices] = resultPlot(deltaToPlot,DeltaVec,pdfType,pdfToPlot,currH,currDist,ditherLength);
+[indices] = resultPlot(deltaToPlot,DeltaVec,pdfType,pdfToPlot,currH,currDist,ditherLength,zeroDitherH,zeroDitherDist);
 
-function [indices] = resultPlot(deltaToPlot,deltaVec,pdfToPlot,pdfVec,H,D,ditherLength)
+function [indices] = resultPlot(deltaToPlot,deltaVec,pdfToPlot,pdfVec,H,D,ditherLength,zdH,zdD)
 
 % Calculate the Avg over the dither
 avgH = reshape(mean(H,2),size(H,1),[]);
@@ -124,25 +132,29 @@ for i=1:length(pdfToPlot)
     % convex hull of R(D|U)
     currH = reshape(H(i,:,:),1,[]);
     currD = reshape(D(i,:,:),1,[]);
-    convHull_Idx = convhull(currD,currH);
+    convHull_Idx = convhull([50 currD],[50 currH]);
     
     % take only the points on the relevant region
-    [~,relevant_ConvHull_Idx] = find(currD(convHull_Idx) < 2);
-    convHull_Idx_ToPlot = convHull_Idx(relevant_ConvHull_Idx);
+%     [~,relevant_ConvHull_Idx] = find(currD(convHull_Idx) < 4);
+%     convHull_Idx_ToPlot = convHull_Idx(relevant_ConvHull_Idx);
+    convHull_Idx_ToPlot = convHull_Idx(:);
     
     % Plot
     figure; hold all
-    plot(shannonD,Rd,'-','LineWidth',1.5)
-    plot(currD(convHull_Idx_ToPlot),currH(convHull_Idx_ToPlot),'-kp')
-    plot(avgDist(i,:),avgH(i,:),'-','LineWidth',1.5)
-    currLegend = {'Shannon : R(D) = 0.5*log(1/D)','Optimum Dither Convex Hull','ECDQ'};
+    plot(shannonD,Rd,'-','LineWidth',2.5)
+    plot(currD(convHull_Idx_ToPlot),currH(convHull_Idx_ToPlot),'--','LineWidth',2.5)
+    plot(avgDist(i,:),avgH(i,:),'-','LineWidth',2.5)
+    plot(zdD(i,:),zdH(i,:),'-.','LineWidth',2.5)
+    currLegend = {'Shannon : R(D)','Optimum Dither Convex Hull','ECDQ','ECQ'};
     for j=1:length(deltaToPlot)
-        plot(D(i,:,indices(j)),H(i,:,indices(j)),'--','LineWidth',1.7)
+        plot(D(i,:,indices(j)),H(i,:,indices(j)),'--','LineWidth',2.5)
         currLegend = [currLegend strcat('\Delta =',num2str(deltaToPlot(j)))];
     end
+    plot(1*ones(1,100),linspace(0,0.005,100),'-k*','LineWidth',1.5)
+    
     grid on; grid minor;
     xlabel('D'); ylabel('R [bits]')
-    legend(currLegend);
+    legend(currLegend,'FontSize',18);
     title(currTitle(i));
     
     xlim([0 2]); ylim([0 3.5])
@@ -155,9 +167,9 @@ for i=1:length(pdfToPlot)
         optimalDither(k) =  currDither(I(k))/deltaVec(J(k));
     end
     figure;
-    plot(deltaVec(J),optimalDither,'gp','LineWidth',1.5);
+    plot(sqrt(deltaVec(J)),optimalDither,'gp','LineWidth',1.5);
     grid on; grid minor;
-    xlabel('\Delta'); ylabel('dither/\Delta');
+    xlabel('\surd{\Delta}'); ylabel('dither/\Delta');
     title(strcat('optimal Dither Value - ',currTitle(i)));
     
     

@@ -7,6 +7,8 @@ clc; clear ; close all;
 %% data
 snri = (-10:1:20);
 snrLin = 10.^(snri/10);
+SIR = 6; % SIR _ dB
+SIR_Lin = 10^(-SIR/20);
 inputType = {'uni'};
 dX = 5e-4; % for numeric calculations
 
@@ -55,6 +57,9 @@ for i=1:length(inputType)
         uniformAlphaDist = zeros(size(xAxis));
         uniformAlphaDist(abs(xAxis) < Delta*alpha) = 1/(2*Delta*alpha);
         
+        % generate interferer dist 
+        uniformAlpha_IntrfrDist = zeros(size(xAxis));
+        uniformAlpha_IntrfrDist(abs(xAxis) < Delta*alpha*SIR_Lin) = 1/(2*Delta*alpha*SIR_Lin);        
         % snr is relative to Tx Output : For the uniform interferer case Tx Output is
         % unifrom between [-Delta,Delta] , so Tx Power = Delta^2 / 3
         sigma = sqrt((Delta^2/3)*10^(-snri(j)/10));
@@ -73,7 +78,7 @@ for i=1:length(inputType)
         % Finite Power DPC : Modulo only in Tx
         calc1 = conv(uniformAlphaDist,alphaTimesNoise)*dX;
         calc1 = calc1(floor(length(uniformAlphaDist)/2) : end - floor(length(uniformAlphaDist)/2));
-        temp_yDist_FiniteDPC = conv(calc1,uniformAlphaDist) * dX;
+        temp_yDist_FiniteDPC = conv(calc1,uniformAlpha_IntrfrDist) * dX;
         temp_yDist_FiniteDPC = temp_yDist_FiniteDPC(floor(length(calc1)/2) : end - floor(length(calc1)/2));
         yDist_FiniteDPC = conv(temp_yDist_FiniteDPC,uniformDist) * dX;
         yDist_FiniteDPC = yDist_FiniteDPC(floor(length(temp_yDist_FiniteDPC)/2) : end - floor(length(temp_yDist_FiniteDPC)/2));
@@ -87,7 +92,7 @@ for i=1:length(inputType)
         
         %% calculate H(Y|X) - first condition on X=x and then average
         % calculation for the finite case
-        noiseConditionedEntropy = calcFiniteDPC_entropy(Delta,alpha,sigma);
+        noiseConditionedEntropy = calcFiniteDPC_entropy(Delta,alpha,sigma,SIR);
         noiseEntropy_FiniteDPC = noiseConditionedEntropy;
         
         noiseEntropy_DPC = -1*sum(noiseDistDPC(noiseDistDPC > 0).*log2(noiseDistDPC(noiseDistDPC > 0))) * dX;
@@ -112,7 +117,7 @@ end
 % clip at the minimum to avoid negative / zeros (that arise from numeric shit)
 [capacity_AWGN,capacity_DPC,capacity_FiniteDPC] = clipCapacity(capacity_AWGN,capacity_DPC,capacity_FiniteDPC);
 
-resultPlot(snri,capacity_AWGN,capacity_DPC,capacity_FiniteDPC,inputType);
+resultPlot(snri,capacity_AWGN,capacity_DPC,capacity_FiniteDPC,inputType,SIR);
 
 
 %% Functions part
@@ -141,7 +146,7 @@ capacity_FiniteDPC = reshape(max(capacity_FiniteDPC(:),abs(min(capacity_FiniteDP
 
 end
 
-function [] =   resultPlot(snr,capacity_AWGN,capacity_DPC,capacity_FiniteDPC,inputType)
+function [] =   resultPlot(snr,capacity_AWGN,capacity_DPC,capacity_FiniteDPC,inputType,SIR)
 
 snrLin = 10.^(snr/10);
 % AWGN Channel capacity
@@ -151,10 +156,10 @@ GaussianCapacity = 0.5*log2(1+ 10.^(snr/10));
 uniform_idx = find(strcmp(inputType,'uni'));
 % Bounds and awgn Capacity
 figure;hold all
-plot(snr,GaussianCapacity,'-*','LineWidth',1.6);
-plot(snr,capacity_AWGN(uniform_idx,:),'-o','LineWidth',1.6);
-plot(snr,capacity_DPC(uniform_idx,:),'-p','LineWidth',1.6);
-plot(snr,capacity_FiniteDPC(uniform_idx,:),'-^','LineWidth',1.6);
+plot(snr,GaussianCapacity,'-*','LineWidth',2.5);
+plot(snr,capacity_AWGN(uniform_idx,:),'-o','LineWidth',2.5);
+plot(snr,capacity_DPC(uniform_idx,:),'-p','LineWidth',2.5);
+plot(snr,capacity_FiniteDPC(uniform_idx,:),'-^','LineWidth',2.5);
 
 set(gca,'FontSize', 12, 'FontName', 'Times New Roman');
 grid on; grid minor;
@@ -164,15 +169,15 @@ ylabel('Capacity (bits/Tx)','FontSize',14,'FontName', 'Times New Roman');
 
 legend('Gaussian Capacity', 'Gaussian Capacity Uniform Input', ...
     'DPC uniform interferer and input I(v;Y)','Finite Power DPC - Uniform Input');
-title('Capacity for AWGN , With uniform interferer and alpha_{MMSE}');
+title({'Capacity for AWGN , With uniform interferer and alpha_{MMSE}',strcat('SIR = ',num2str(SIR),' [dB]')});
 
 % Plot Vs EbN0
 % Bounds and awgn Capacity
 figure;hold all
-plot(10*log10(snrLin./(2*GaussianCapacity)),GaussianCapacity,'-*','LineWidth',1.6);
-plot(10*log10(snrLin./(2*capacity_AWGN(uniform_idx,:))),capacity_AWGN(uniform_idx,:),'-o','LineWidth',1.6);
-plot(10*log10(snrLin./(2*capacity_DPC(uniform_idx,:))),capacity_DPC(uniform_idx,:),'-p','LineWidth',1.6);
-plot(10*log10(snrLin./(2*capacity_FiniteDPC(uniform_idx,:))),capacity_FiniteDPC(uniform_idx,:),'-^','LineWidth',1.6);
+plot(10*log10(snrLin./(2*GaussianCapacity)),GaussianCapacity,'-*','LineWidth',2.5);
+plot(10*log10(snrLin./(2*capacity_AWGN(uniform_idx,:))),capacity_AWGN(uniform_idx,:),'-o','LineWidth',2.5);
+plot(10*log10(snrLin./(2*capacity_DPC(uniform_idx,:))),capacity_DPC(uniform_idx,:),'-p','LineWidth',2.5);
+plot(10*log10(snrLin./(2*capacity_FiniteDPC(uniform_idx,:))),capacity_FiniteDPC(uniform_idx,:),'-^','LineWidth',2.5);
 
 set(gca,'FontSize', 12, 'FontName', 'Times New Roman');
 grid on; grid minor;
@@ -182,6 +187,6 @@ ylabel('Capacity (bits/Tx)','FontSize',14,'FontName', 'Times New Roman');
 
 legend('Gaussian Capacity', 'Gaussian Capacity Uniform Input', ...
     'DPC uniform interferer and input I(v;Y)','Finite Power DPC - Uniform Input');
-title(strcat('Capacity for AWGN , With uniform interferer and alpha_{MMSE} '));
+title({'Capacity for AWGN , With uniform interferer and alpha_{MMSE}',strcat('SIR = ',num2str(SIR),' [dB]')});
 end
 

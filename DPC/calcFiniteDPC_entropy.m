@@ -1,6 +1,7 @@
-function H = calcFiniteDPC_entropy(Delta,alpha,sigma)
+function H = calcFiniteDPC_entropy(Delta,alpha,sigma,sir_dB)
 % This function calculate H(Y|v) for the Finiter DPC Case with alpha MMSE :
 % Y = alpha*(v-alpha*S+U) - U + alpha*Z + alpha*Z
+sirLin = 10^(-sir_dB/20);
 
 nPoints = 1e2;
 v = linspace(-Delta,Delta,nPoints);
@@ -8,7 +9,7 @@ H = 0;
 for i = 1 : length(v)
     
     % generate sample sequence , for current v
-    S = 2*Delta * (rand(1,1e6) - 0.5);
+    S = 2*Delta * sirLin * (rand(1,1e6) - 0.5);
     U = 2*Delta * (rand(1,1e6) - 0.5);
     Z = sigma*randn(1,1e6);
     X = alpha*(mod(v(i) - alpha*S + U + Delta,2*Delta) - Delta) - U;
