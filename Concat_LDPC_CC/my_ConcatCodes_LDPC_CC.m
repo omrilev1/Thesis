@@ -14,21 +14,22 @@ resultsFileName = strcat('.\results\',date,'TurboIterations_Results');
 
 
 % Init Params
-convCode.constraintLength = [8,7];
+convCode.constraintLength = [8];
 convCode.rate = [1/2];% [1/4 1/3 2/5 1/2];
+
+turboIterations = [3,2,1,0];
 
 decoding_method = [1]; % 0 for LDPC in hard decision , 1 for soft
 dvb_rate = [2/5];%[9/10 5/6 3/4 2/3 2/5 ];
 
-percentDeletions = [0 0.1 0.2 0.3];
-turboIterations = [0,1,2,3];
+percentDeletions = [0.3 0.2 0.1 0];
 
 blockIntrlvDepth = 256;
 
-params = combvec(percentDeletions,convCode.constraintLength,convCode.rate,dvb_rate,decoding_method);
+params = combvec(turboIterations,percentDeletions,convCode.constraintLength,convCode.rate,dvb_rate,decoding_method);
 cnt = 1;
 
-EbN0 = -0.5:0.25:4.5;
+EbN0 = (-0.5:0.25:4.5);
 m = 1;
 
 Nout = 50;
@@ -40,11 +41,12 @@ effectiveRate = zeros(1,size(params,2));
 
 NbitsLDPC = 64800;
 while cnt<size(params,2)
-    curr_del = params(1,cnt);
-    curr_constraintLength = params(2,cnt);
-    curr_conv_r = params(3,cnt);
-    curr_LDPC_r = params(4,cnt);
-    curr_decMethod = params(5,cnt);
+    curr_iter = params(1,cnt);
+    curr_del = params(2,cnt);
+    curr_constraintLength = params(3,cnt);
+    curr_conv_r = params(4,cnt);
+    curr_LDPC_r = params(5,cnt);
+    curr_decMethod = params(6,cnt);
     
     %% Generate the corresponding convolutional code
     [poly,tblLen] = convCodeGen(curr_constraintLength,curr_conv_r);
@@ -53,9 +55,11 @@ while cnt<size(params,2)
     H = dvbs2ldpc(curr_LDPC_r);
     ldpc_enc = comm.LDPCEncoder(H);
     if curr_decMethod == 0
-        ldpc_dec = comm.LDPCDecoder(H,'DecisionMethod','Hard decision','MaximumIterationCount',70);
+        ldpc_dec = comm.LDPCDecoder(H,'DecisionMethod','Hard decision','MaximumIterationCount',63,...
+            'OutputValue','Whole codeword');
     else
-        ldpc_dec = comm.LDPCDecoder(H,'DecisionMethod','Soft decision','MaximumIterationCount',70); 
+        ldpc_dec = comm.LDPCDecoder(H,'DecisionMethod','Soft decision','MaximumIterationCount',63,...
+            'OutputValue','Whole codeword');
     end
     
     % generate convolutional code
@@ -66,8 +70,8 @@ while cnt<size(params,2)
         'Algorithm','Max*','CodedBitLLROutputPort',false);
     Nbits = size(H,2) - size(H,1);numOfErr_Conv = 0; numOfErr = 0;
     for i=1:length(EbN0)
-        numOfErr_Conv = 0;
-        numOfErr_Final = 0;
+        numOfErr_Conv = zeros(1,curr_iter+1);
+        numOfErr_Final = zeros(1,curr_iter+1);
         for n_in = 1:Nin
             
             raw_bits = rand(Nbits,1) > 0.5;
@@ -97,7 +101,7 @@ while cnt<size(params,2)
             interleavedBits = blockIntrlv(:);
             
             %% Encode convolutional
-%             Tx_codeword = convenc(interleavedBits,trellis);
+            %             Tx_codeword = convenc(interleavedBits,trellis);
             Tx_codeword = step(conv_enc,interleavedBits);
             
             %% channel
@@ -113,47 +117,62 @@ while cnt<size(params,2)
             
             llr = calcLLR(y,m,10^(-SNR/10));
             
-            %% Decode Convolutional code
-            dataSoft = step(conv_dec,zeros(size(interleavedBits)),llr);
-%             dataSoft = vitdec(llr,trellis,tblLen,'cont','unquant');
-            dataHard = dataSoft > 0;
-            if curr_decMethod == 0
-                llr_ForDeintlrv = dataHard;
-            else
-                llr_ForDeintlrv = dataSoft;     
+            %% Decode Convolutional code + LDPC in an iterative manner
+            
+            convCode_priors = zeros(size(interleavedBits));
+            for decodeIter=0:curr_iter
+                
+                % Decode Convolutional code
+                
+                % in the first iteraticon take aprior probabilities to be
+                % [1/2,1/2]. After that take the apriori probabilities from
+                % LDPC output LLRs
+                dataSoft = step(conv_dec,convCode_priors,llr);
+                dataHard = dataSoft > 0;
+                if curr_decMethod == 0
+                    llr_ForDeintlrv = dataHard;
+                else
+                    llr_ForDeintlrv = dataSoft;
+                end
+                
+                % count Convolutional code BER
+                numOfErr_Conv(decodeIter+1) = numOfErr_Conv(decodeIter+1) + sum(dataHard(:) ~= interleavedBits(:));
+                
+                %% Deinterleave soft bits
+                block_DeIntrlv = reshape(llr_ForDeintlrv,blockIntrlvDepth,[]);
+                block_DeIntrlvMat = block_DeIntrlv.';
+                LDPC_llrs = block_DeIntrlvMat(:);
+                
+                % add deletions - deletion will be treated as LLR = 0
+                LDPC_final_llrs = zeros(NbitsLDPC,1);
+                LDPC_final_llrs(dataIdx) = LDPC_llrs;
+                LDPC_final_llrs(deletIdx) = 0;
+                
+                % decode LDPC
+                ldpc_decodedLLRs = step(ldpc_dec,LDPC_final_llrs);
+                ldpc_decodedBits = ldpc_decodedLLRs > 0;
+                
+                % count BER
+                if curr_decMethod == 0
+                    numOfErr_Final(decodeIter+1) = numOfErr_Final(decodeIter+1) + sum(ldpc_decodedBits(1:Nbits) ~= not(raw_bits));
+                else
+                    numOfErr_Final(decodeIter+1) = numOfErr_Final(decodeIter+1) + sum(ldpc_decodedBits(1:Nbits) ~= raw_bits);
+                end
+                
+                % calculate conv-code next iteration llrs
+                convCode_priors = ldpc_decodedLLRs(dataIdx);
+                blockIntrlvMat = reshape(convCode_priors,[],blockIntrlvDepth);
+                blockIntrlv    = blockIntrlvMat.';
+                convCode_priors = blockIntrlv(:);
             end
-            
-            % count Convolutional code BER
-            numOfErr_Conv = numOfErr_Conv + sum(dataHard(:) ~= interleavedBits(:));
-            
-            %% Deinterleave soft bits
-            block_DeIntrlv = reshape(llr_ForDeintlrv,blockIntrlvDepth,[]);
-            block_DeIntrlvMat = block_DeIntrlv.';
-            LDPC_llrs = block_DeIntrlvMat(:);
-            
-            % add deletions - deletion will be treated as LLR = 0
-            LDPC_final_llrs = zeros(NbitsLDPC,1);
-            LDPC_final_llrs(dataIdx) = LDPC_llrs;
-            LDPC_final_llrs(deletIdx) = 0;
-            % decode LDPC
-            ldpc_decodedLLRs = step(ldpc_dec,LDPC_final_llrs);
-            
-            ldpc_decodedBits = ldpc_decodedLLRs > 0;
-            
-            % count BER
-            if curr_decMethod == 0
-                numOfErr_Final = numOfErr_Final + sum(ldpc_decodedBits(:) ~= not(raw_bits));
-            else
-                numOfErr_Final = numOfErr_Final + sum(ldpc_decodedBits(:) ~= raw_bits);
-            end
-            if numOfErr_Final > 50
-                BER(i,cnt) = numOfErr_Final/(Nbits*n_in);
+            if numOfErr_Final(end) > 50
+                BER(i,cnt) = numOfErr_Final(end)/(Nbits*n_in);
                 break
             end
         end
         if BER(i,cnt) < 1e-6
             BER(i:end,cnt) = 1e-6;
-            BER_conv(i,cnt) = numOfErr_Conv/(n_in*length(interleavedBits));
+            BER_conv(i,cnt) = numOfErr_Conv(decodeIter+1)/(n_in*length(interleavedBits));
             
             effectiveRate(cnt) = Nbits/length(Tx_codeword);
             iterMessage = sprintf('LDPC : rate %0.2f , Deletion Percentage = %0.2f \nConvolutional Rate = %0.2f constraint length = %0.2f \n Effective Rate = %0.2f%',curr_LDPC_r,100*curr_del,curr_conv_r,curr_constraintLength,effectiveRate(cnt));
@@ -164,7 +183,7 @@ while cnt<size(params,2)
             
         end
         
-        BER_conv(i,cnt) = numOfErr_Conv/(n_in*length(interleavedBits));
+        BER_conv(i,cnt) = numOfErr_Conv(decodeIter+1)/(n_in*length(interleavedBits));
         effectiveRate(cnt) = Nbits/length(Tx_codeword);
         iterMessage = sprintf('LDPC : rate %0.2f , Deletion Percentage = %0.2f \nConvolutional Rate = %0.2f constraint length = %0.2f \n Effective Rate = %0.2f%',curr_LDPC_r,100*curr_del,curr_conv_r,curr_constraintLength,effectiveRate(cnt));
         iterMessage2 = sprintf('BER Convolutional = %.5f overall BER = %.5f',BER_conv(i,cnt),BER(i,cnt));
@@ -174,25 +193,25 @@ while cnt<size(params,2)
     cnt = cnt + 1;
     
     if mod(cnt-1,4) == 0
-    % plot group of deletions
-    lineType = ['-kd';'-go';'-b*';'-rs';'--c'];
-    figure;
-    for idx = 1:(length(lineType) - 1)
-        semilogy(EbN0.',BER(:,4*((cnt - 1)/4 - 1) + idx),lineType(idx,:),'LineWidth',2)
-        hold on;
-    end
-    semilogy(EbN0.',BER_conv(:,(cnt - 1)),'-xm','LineWidth',2)
-    grid on; grid minor;
-    xlabel('E_b / N_0 [dB]'); ylabel('BER')
-    
-    legend(sprintf('Deletion Percentage = %0.2f  , effective Rate = %0.2f',percentDeletions(1),effectiveRate(4*((cnt - 1)/4 - 1) + 1)),...
-        sprintf('Deletion Percentage = %0.2f  , effective Rate = %0.2f',percentDeletions(2),effectiveRate(4*((cnt - 1)/4 - 1) + 2)),...
-        sprintf('Deletion Percentage = %0.2f  , effective Rate = %0.2f',percentDeletions(3),effectiveRate(4*((cnt - 1)/4 - 1) + 3)),...
-        sprintf('Deletion Percentage = %0.2f  , effective Rate = %0.2f',percentDeletions(4),effectiveRate(4*((cnt - 1)/4 - 1) + 4)),...
-        'convolutional BER');
-    
-    plotMessage = sprintf('LDPC : rate %0.2f \nConvolutional Rate = %0.2f \n constraint length = %0.2f',curr_LDPC_r,curr_conv_r,curr_constraintLength);
-    title(plotMessage)
+        % plot group of deletions
+        lineType = ['-kd';'-go';'-b*';'-rs';'--c'];
+        figure;
+        for idx = 1:(length(lineType) - 1)
+            semilogy(EbN0.',BER(:,4*((cnt - 1)/4 - 1) + idx),lineType(idx,:),'LineWidth',2)
+            hold on;
+        end
+        semilogy(EbN0.',BER_conv(:,(cnt - 1)),'-xm','LineWidth',2)
+        grid on; grid minor;
+        xlabel('E_b / N_0 [dB]'); ylabel('BER')
+        
+        legend(sprintf('Deletion Percentage = %0.2f  , effective Rate = %0.2f',percentDeletions(1),effectiveRate(4*((cnt - 1)/4 - 1) + 1)),...
+            sprintf('Deletion Percentage = %0.2f  , effective Rate = %0.2f',percentDeletions(2),effectiveRate(4*((cnt - 1)/4 - 1) + 2)),...
+            sprintf('Deletion Percentage = %0.2f  , effective Rate = %0.2f',percentDeletions(3),effectiveRate(4*((cnt - 1)/4 - 1) + 3)),...
+            sprintf('Deletion Percentage = %0.2f  , effective Rate = %0.2f',percentDeletions(4),effectiveRate(4*((cnt - 1)/4 - 1) + 4)),...
+            'convolutional BER');
+        
+        plotMessage = sprintf('LDPC : rate %0.2f \nConvolutional Rate = %0.2f \n constraint length = %0.2f',curr_LDPC_r,curr_conv_r,curr_constraintLength);
+        title(plotMessage)
     end
 end
 save(resultsFileName,'params','BER','effectiveRate');

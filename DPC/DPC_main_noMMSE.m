@@ -226,7 +226,7 @@ function [] =   resultPlot(snr,capacity_AWGN,capacity_DPC,capacity_FiniteDPC,inp
 
 snrLin = 10.^(snr/10);
 % AWGN Channel capacity
-GaussianCapacity = 0.5*log2(1+ 10.^(snr/10));
+GaussianCapacity = 0.5*log2(1+ snrLin);
 lowerBound_FiniteDPC = max(0,0.5*log2(1+ 2 * 10.^(snr/10)) - 0.754);
 
 % Plot Finite DPC + DPC + AWGN + Lower Bound , for uniform input , EsN0
