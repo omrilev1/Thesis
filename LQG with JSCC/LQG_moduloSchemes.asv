@@ -26,18 +26,18 @@ P = delta^2/3;
 
 % cost parameters
 Q = 1;
-R = 2;
+R = 1;
 
 
-SNR = [25 20 15 10 8 5];
+SNR = [25 20 15 10 8];
 deltaSNR = 5;
 snrLin = 10.^(SNR/10);
 snrFeedback_Lin = 10.^((SNR + deltaSNR)/10);
 
 initArrays;
 
-P_alias = 5*1e-2;
-N_feedback = 8;
+P_alias = 1e-3;
+N_feedback = 4;
 % set timesharing parameters - we need to scale the powers to the overall
 % avergae power will be P
 uncoded_timesharing_factor = 4;
@@ -124,7 +124,7 @@ for i=1:length(SNR)
             a_fullAccess = sqrt(P/P_error_predict(i,t))*(x_fullAccess(i,t) - x_hat_predict_fullAccess(i,t));
             
             %% zero access : linear subtractor
-            norm = (k_vec(t-1))^2 * P_error_estim_zeroAccess(i,t-1) + W;
+            norm = (k_vec(t-1)/alpha)^2 * P_error_predict_zeroAccess(i,t) + (1-(k_vec(t-1)/alpha)^2)*W;
             a_zeroAccess = sqrt(P/norm) * (x_zeroAccess(i,t) - (alpha - k_vec(t-1))*x_zeroAccess(i,t-1));
             
             %% zero access with modulo : scale the unknown source part using "zooming" factor, and dither and send through the channel
@@ -166,6 +166,7 @@ for i=1:length(SNR)
             [x_final,MSE_final] = feedback_over_awgn(x_hat_predict_partialAccess_feedback(i,t),P,P_X_hat_linear(t),SNR(i) + deltaSNR,...
                 -1*deltaSNR,N_feedback,P_alias);
             
+            disp(strcat('err = ',num2str(abs((x_hat_predict_partialAccess_feedback(i,t) - x_final)/abs(x_hat_predict_partialAccess_feedback(i,t))))));
             norm_partialAccess_feedback = P_error_predict_partialAccess_feedback(i,t) + MSE_final;
             a_partialAccess_feedback = sqrt(P/norm_partialAccess_feedback) * (x_partialAccess_feedback(i,t) - x_final);
         end
@@ -182,7 +183,7 @@ for i=1:length(SNR)
         
         % estimation
         if t==1
-            x_hat_estim_zeroAccess(i,t) = snrLin(i)/(1+snrLin(i))*sqrt(W/P)*b_zeroAccess;
+            x_hat_zeroAccess(i,t) = snrLin(i)/(1+snrLin(i))*sqrt(W/P)*b_zeroAccess;
             x_hat_estim_fullAccess(i,t) = snrLin(i)/(1+snrLin(i)) * sqrt(W/P) * b_fullAccess;
             x_hat_estim_partialAccess(i,t) = snrLin(i)/(1+snrLin(i)) * sqrt(W/P) * b_partialAccess;
             x_hat_estim_zeroAccess_modulo(i,t) = snrLin(i)/(1+snrLin(i)) * sqrt(W/P) * b_zeroAccess_modulo;
@@ -198,7 +199,7 @@ for i=1:length(SNR)
             zeta = (sqrt(P/norm) / (P + sigma_z^2))*((k_vec(t-1)/alpha) * P_error_predict_zeroAccess(i,t) + (1 - k_vec(t-1)/alpha)*W);
             y_tilde = zeta*b_zeroAccess;
             x_hat_estim_zeroAccess(i,t) = x_hat_predict_zeroAccess(i,t) + y_tilde ;
-            P_error_estim_zeroAccess(i,t) = (1 - sqrt(P/norm)*zeta*k_vec(t-1)/alpha)^2*P_error_predict_zeroAccess(i,t) + ...
+            P_error_estim_zeroAccess(i,t) = (1 - sqrt(P/norm)*zeta*k_vec(t-1)/alpha)*P_error_predict_zeroAccess(i,t) + ...
                 zeta^2 * (sigma_z)^2 + ...
                 ((zeta*sqrt(P/norm)*(1-k_vec(t-1)/alpha))^2 - 2*zeta*sqrt(P/norm)*(1-k_vec(t-1)/alpha)*(1-k_vec(t-1)*zeta*sqrt(P/norm)/alpha))*W;
             
@@ -206,10 +207,9 @@ for i=1:length(SNR)
             gamma = sqrt(P/norm_partialAccess);
             partial_zeta = gamma*P_error_predict_partialAccess(i,t)/(P + (sigma_z)^2);
             x_hat_estim_partialAccess(i,t) = x_hat_predict_partialAccess(i,t) + partial_zeta * b_partialAccess;
-%             P_error_estim_partialAccess(i,t) = (1-gamma*partial_zeta)^2*P_error_predict_partialAccess(i,t) + ...
-%                 (partial_zeta*gamma)^2 * (sigma_v)^2 + zeta^2*(sigma_z)^2;
             P_error_estim_partialAccess(i,t) = (1-gamma*partial_zeta)^2*P_error_predict_partialAccess(i,t) + ...
-                (partial_zeta*gamma*estim_coeff)^2 * (sigma_v)^2 + zeta^2*(sigma_z)^2;                
+                (partial_zeta*gamma)^2 * (sigma_v)^2 + zeta^2*(sigma_z)^2;
+            
             %% zero access : modulo receiver
             
             % handle uncoded transmissions
@@ -301,21 +301,21 @@ for i=1:length(SNR)
     xlabel('t'); ylabel('state')
     legend('x(t) for full control access','x(t) for zero control access','x(t) for partial control access',...
         'x(t) for zero control access, with Kochman-Zamir',...
-        strcat('x(t) for partial control access, with feedback :',num2str(N_feedback),' iterations'))
+        strcat('x(t) for partial control access, with feedback',num2str(N_)
     title(strcat('state , snr = ',num2str(SNR(i)),'[dB]',' \Deltasnr = ',num2str(deltaSNR)))
     grid on; grid minor;
     
     figure; hold all
-    plot(1:T,10*log10(J_fullAccess(i,:)),'-gs','LineWidth',1.5)
-    plot(1:T,10*log10(J_zeroAccess(i,:)),'-kp','LineWidth',1.5)
-    plot(1:T,10*log10(J_partialAccess(i,:)),'-r*','LineWidth',1.5)
-    plot(1:T,10*log10(J_zeroAccess_modulo(i,:)),'-cd','LineWidth',1.5)
-    plot(1:T,10*log10(J_partialAccess_feedback(i,:)),'-b>','LineWidth',1.5)
+    plot(1:T,10*log10(J_fullAccess(i,:)),'-gs','LineWidth',2)
+    plot(1:T,10*log10(J_zeroAccess(i,:)),'-kp','LineWidth',2)
+    plot(1:T,10*log10(J_partialAccess(i,:)),'-r*','LineWidth',2)
+    plot(1:T,10*log10(J_zeroAccess_modulo(i,:)),'-cd','LineWidth',2)
+    plot(1:T,10*log10(J_partialAccess_feedback(i,:)),'-b>','LineWidth',2)
     grid on; grid minor;
     xlabel('t'); ylabel('cost [dB]');
     title(strcat('Cost in [dB] over time , snr = ',num2str(SNR(i)),'[dB]',' \Deltasnr = ',num2str(deltaSNR)));
     legend('Full Access','Zero Access','Partial Access',...
-        'Zero Access - kochman zamir',strcat('Partial Access - feedback : ',num2str(N_feedback),' iterations'));
+        'Zero Access - kochman zamir',strcat('Partial Access - feedback ',num2str(N_feedback),' iterations'));
     
 end
 

@@ -1,11 +1,10 @@
-function [theta_final] = feedback_over_awgn(theta,P,m,snr,delta_snr,N_feedback)
+function [theta_final,MSE_final] = feedback_over_awgn(theta,P,Pin,snr,delta_snr,N_feedback,p_alias)
 % This function simulate the communication with noisy feedback scheme of
 % Assaf and Ofer []. 
 % Inputs : 
 %   o theta : information signal. Inside the power limits (needs to be
 %   normalized before and multiplied after by appropriate scale factor) 
 %   o P : input power constraint
-%   o m : PAM order
 %   o snr : channel snr
 %   o delta_snr : snr + delta_snr is the snr of the feedback path
 X = zeros(1,N_feedback);
@@ -17,31 +16,19 @@ sigma_n_feedback = sqrt(P/10^((snr + delta_snr)/10));
 
 % generate feedback constants 
 
-d = sqrt(12*P);
-delta = d/2;
-dither = d*(rand(1,N_feedback) - 0.5); % uni[-d/2,d/2]
+d = sqrt(3*P);
+delta = d;
+dither = 2*d*(rand(1,N_feedback) - 0.5); % uni[-delta,delta]
 
 % calculate feedback estimation constants
-p_m = 1e-6/(2*N_feedback);
-lambda = 3/(qfuncinv(p_m/2))^2;
-gamma = sqrt((lambda*d^2/12 - sigma_n_feedback^2)/
+[MSE,power_scale,beta,gamma] = calc_feedback_coeffs(P,Pin,sigma_n,sigma_n_feedback,N_feedback,p_alias);
 
-
-%% Initialization : generate the PAM symbol
-% PAM constellation scaling factor
-R = log2(m);
-eta = sqrt(P)*sqrt(3/(2^(2*R) - 1));
-
-% generate PAM points 
-pam_symbol = pammod(0:1:(m-1),m,0,'gray');
-
-% quantize theta and generate the transmitted symbol
-[~,quant_idx] = min(abs(theta - eta*pam_symbol));
+%% Initialization : generate the dirst estimator
 
 % first iteration - simple uncoded transmission
-X(1) = eta*pam_symbol(quant_idx);
+X(1) = sqrt(P/Pin)*theta;
 Y = X(1) + sigma_n*randn;
-theta_hat(1) = Y;
+theta_hat(1) = sqrt(Pin/P)*Y;
 
 for i=1:N_feedback
     
@@ -52,18 +39,18 @@ for i=1:N_feedback
     Y_tilde = X_tilde + sigma_n_feedback*randn;
     
     %% Terminal A : estimate the new Rx estimation error and sends to Terminal B 
-    epsilon_tilde = mod(Y_tilde - gamma(i)*X(1) - dither(i) + delta,2*delta) - delta;
-    X(i+1) = alpha(i)*epsilon_tilde;
+    epsilon_tilde = mod(Y_tilde - gamma(i)*theta - dither(i) + delta,2*delta) - delta;
+    X(i+1) = power_scale(i)*epsilon_tilde/gamma(i);
     Y = X(i+1) + sigma_n*randn;
     
     %% Terminal B : estimate the new estimation error
-    theta_hat(i+1) = theta_hat(i) - beta(i+1)*Y;
+    theta_hat(i+1) = theta_hat(i) - beta(i)*Y;
     
 end
 
-%% Final Stage : information signal decoding 
-decod_idx = min(abs(theta_hat(N_feedback+1) - eta*pam_symbol));
-theta_final = pam_symbol(decod_idx);
+%% Final Stage : information signal is the signal in the last iteration 
+theta_final = theta_hat(N_feedback+1);
+MSE_final = MSE(N_feedback);
 
 end
 

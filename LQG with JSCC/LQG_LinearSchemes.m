@@ -36,13 +36,17 @@ snrFeedback_Lin = 10.^((SNR + deltaSNR)/10);
 
 initArrays; 
 
+P_X = zeros(1,T);
+P_X_hat = zeros(1,T);
+
 cnt = 0;
 for i=1:length(SNR)
     sigma_z = sqrt(P/10^(SNR(i)/10));
     sigma_v = sqrt(P/10^((SNR(i) + deltaSNR)/10));
     % calculate LQG parameters for current run
     k_vec = calcLQG(Q,R,T,alpha);
-
+    P_X = zeros(1,T);
+    P_X_hat = zeros(1,T);
     for t=1:T
         
         %% plant
@@ -86,6 +90,8 @@ for i=1:length(SNR)
             a_fullAccess = sqrt(P/W)*x_fullAccess(i,t);
             a_zeroAccess = sqrt(P/W)*x_zeroAccess(i,t);
             a_partialAccess = sqrt(P/W)*x_partialAccess(i,t);
+            
+            P_X(t) = W;
         else
             % full access : subtract the last stage receive side
             % estimation, and normalize
@@ -99,18 +105,16 @@ for i=1:length(SNR)
             
             % noisy control channel : the powers need to be normalized
             % properly ! 
-%             r = sqrt(P/P_error_predict_partialAccess(i,t))*x_hat_predict_partialAccess(i,t) + sigma_v*randn;
-%             estim_coeff = sqrt(P*P_error_predict_partialAccess(i,t))/(P + sigma_v^2);
-%             x_estim = estim_coeff*r;
-%             
-%             norm_partialAccess = P_error_predict_partialAccess(i,t) + P_error_predict_partialAccess(i,t)^2 / (1+snrFeedback_Lin(i));
-%             a_partialAccess = sqrt(P/norm_partialAccess) * (x_partialAccess(i,t) - (x_hat_predict_partialAccess(i,t) + sigma_v*randn));
-
-            r = sqrt(P/(2*W))*x_hat_predict_partialAccess(i,t) + sigma_v*randn;
-            estim_coeff = sqrt(P*2*W)/(P + sigma_v^2);
-            x_estim = ((P + sigma_v^2)/P)*estim_coeff*r; 
+%             P_X(t) = W/(1+k_vec(t-1))^2 + P_X(t-1) * alpha^2/(1+k_vec(t-1))^2 + P_error_estim_partialAccess(i,t) * (k_vec(t-1)/(1+k_vec(t-1)))^2;
+%             P_X_hat(t) = P_X(t) + P_error_predict_partialAccess(i,t);
+            P_X(t) = W + P_X(t-1) * (alpha - k_vec(t-1))^2 + (k_vec(t-1))^2 * P_error_estim_partialAccess(i,t-1);
+            P_X_hat(t) = P_X(t) + P_error_predict_partialAccess(i,t-1);            
             
-            norm_partialAccess = P_error_predict_partialAccess(i,t) + 2*W / snrFeedback_Lin(i);
+            r = sqrt(P/P_X_hat(t))*x_hat_predict_partialAccess(i,t) + sigma_v*randn;
+            estim_coeff = sqrt(P_X_hat(t)/P);
+            x_estim = estim_coeff*r; 
+            
+            norm_partialAccess = P_error_predict_partialAccess(i,t) + estim_coeff^2 * sigma_v^2;
             a_partialAccess = sqrt(P/norm_partialAccess) * (x_partialAccess(i,t) - x_estim);
             
         end
