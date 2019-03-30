@@ -3,7 +3,6 @@ x_zeroAccess = zeros(length(SNR),T,N_avg);
 x_partialAccess = zeros(length(SNR),T,N_avg);
 x_hat_partialAccess = zeros(length(SNR),T,N_avg);
 x_hat_partialAccess_feedback = zeros(length(SNR),T,N_avg);
-x_hat_partialAccess_feedback_linear = zeros(length(SNR),T,N_avg);
 
 x_hat_estim_fullAccess = zeros(length(SNR),T,N_avg); % x\hat(t|t)
 x_hat_predict_fullAccess = zeros(length(SNR),T,N_avg); % x\hat(t+1|t)
@@ -20,22 +19,17 @@ x_hat_predict_zeroAccess_modulo = zeros(length(SNR),T,N_avg); % x\hat(t+1|t)
 x_hat_estim_partialAccess_feedback = zeros(length(SNR),T,N_avg); % x\hat(t|t)
 x_hat_predict_partialAccess_feedback = zeros(length(SNR),T,N_avg); % x\hat(t+1|t)
 
-x_hat_estim_partialAccess_feedback_linear = zeros(length(SNR),T,N_avg); % x\hat(t|t)
-x_hat_predict_partialAccess_feedback_linear = zeros(length(SNR),T,N_avg); % x\hat(t+1|t)
-
 u_partialAccess = zeros(length(SNR),T,N_avg);
 u_fullAccess = zeros(length(SNR),T,N_avg);
 u_zeroAccess = zeros(length(SNR),T,N_avg);
 u_zeroAccess_modulo = zeros(length(SNR),T,N_avg);
 u_partialAccess_feedback = zeros(length(SNR),T,N_avg);
-u_partialAccess_feedback_linear = zeros(length(SNR),T,N_avg);
 
 J_partialAccess = zeros(length(SNR),T,N_avg);
 J_fullAccess = zeros(length(SNR),T,N_avg);
 J_zeroAccess = zeros(length(SNR),T,N_avg);
 J_zeroAccess_modulo = zeros(length(SNR),T,N_avg);
 J_partialAccess_feedback = zeros(length(SNR),T,N_avg);
-J_partialAccess_feedback_linear = zeros(length(SNR),T,N_avg);
 
 
 P_error_estim = zeros(length(SNR),T,N_avg);
@@ -53,14 +47,11 @@ P_error_predict_zeroAccess_modulo = zeros(length(SNR),T,N_avg);
 P_error_estim_partialAccess_feedback = zeros(length(SNR),T,N_avg);
 P_error_predict_partialAccess_feedback = zeros(length(SNR),T,N_avg);
 
-P_error_estim_partialAccess_feedback_linear = zeros(length(SNR),T,N_avg);
-P_error_predict_partialAccess_feedback_linear = zeros(length(SNR),T,N_avg);
-
 P_X_linear = zeros(1,T,N_avg);
 P_X_modulo = zeros(1,T,N_avg);
 
 P_X_hat_linear = zeros(1,T,N_avg);
-P_X_hat_modulo = zeros(1,T,N_avg);
+P_X_hat_modulo = zeros(1,T);
 
 
 
