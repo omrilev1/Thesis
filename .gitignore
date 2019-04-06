@@ -2,3 +2,8 @@
 ECDQ/ECDQ.asv
 DPC/DPC_main.asv
 Concat_LDPC_CC/my_ConcatCodes_LDPC_CC.asv
+LQG with JSCC/probabilities_calc.m
+LQG with JSCC/Q1_R0_controlCost.jpg
+LQG with JSCC/Q1_R1_controlCost.jpg
+LQG with JSCC/Q1_R1_controlCost_10dB.jpg
+LQG with JSCC/Q1_R2_controlCost.jpg
