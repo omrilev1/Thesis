@@ -10,7 +10,7 @@ beta = zeros(1,Nfeedback);
 gamma = zeros(1,Nfeedback);
 
 
-snr = P/sigma_n;
+snr = P/sigma_n^2;
 % initialization
 
 for n = 1 : Nfeedback

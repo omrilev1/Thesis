@@ -13,17 +13,15 @@
 % x_(t+1) = alpha*x_t + w_(t+1) + u_t
 % where w_(t+1) is wgn with variance W
 
-% This script simulate only linear schemes , i.e no modulo operations
-
 close all; clear all; clc;
 debug = 0;
 %% coefficeints initialization
 % model coefficients
 alpha = 2;
 W = 1; % input gaussian variance
-T = 2^10; % horizon
-delta = 3;
-P = delta^2/3;
+T = 2^8; % horizon
+delta = 4.3;
+P = 1; % delta^2/3;
 
 % cost parameters
 Q = 1;
@@ -32,11 +30,11 @@ ratio_up = 4; % upper limit of control coeffs ratio
 ratio_down = 1/4; % lower limit of control coeffs ratio
 
 
-scale = 'worst_case'; % 'randomized','worst_case'
-sign_cheat = 1; % to transmit in the feedback path only the absolute value, with half of the power
+scale = 'randomized'; % 'randomized','worst_case'
+sign_cheat = 0; % to transmit in the feedback path only the absolute value, with half of the power
 
 SNR = 6; % [20 15 10 8 6];
-deltaSNR = 12;
+deltaSNR = 3;
 snrLin = 10.^(SNR/10);
 snrFeedback_Lin = 10.^((SNR + deltaSNR)/10);
 
@@ -44,8 +42,8 @@ N_avg = 300;
 
 initArrays;
 
-P_alias = 9*1e-3;
-N_feedback = 4;
+P_alias = 4*1e-2;
+N_feedback = 2;
 % set timesharing parameters - we need to scale the powers to the overall
 % avergae power will be P
 uncoded_timesharing_factor = 2;
@@ -65,7 +63,14 @@ for i=1:length(SNR)
     P_X_partial = zeros(T,N_avg);
     P_X_hat_partial = zeros(T,N_avg);
     
+    P_X_full_debug = zeros(T,N_avg);
+    P_X_linear_debug = zeros(T,N_avg);
+    P_X_partial_debug = zeros(T,N_avg);
+    P_X_partial_feedback_linear_debug = zeros(T,N_avg);
+    P_X_partial_feedback_debug = zeros(T,N_avg);
+    
     P_X_modulo = zeros(T,N_avg);
+    P_X_modulo_debug = zeros(T,N_avg);
     P_X_hat_modulo = zeros(T,N_avg);
     
     P_X_feedback = zeros(T,N_avg);
@@ -145,28 +150,36 @@ for i=1:length(SNR)
                 %% full access :
                 % subtract the last stage receive side estimation, and normalize
                 a_fullAccess = sqrt(P/P_error_predict(i,t,n))*(x_fullAccess(i,t,n) - x_hat_predict_fullAccess(i,t,n));
-                
-                %% Zero access , linear scheme : normalize to worst case power, rest is same as Kochman-Zamir
+                P_X_full_debug(t,n) = a_fullAccess.^2;
+                %% Zero access , linear scheme : normalize according to some strategy, rest is same as Kochman-Zamir
                 if strcmp(scale,'randomized')
                     k_for_power = (k_vec_up(t-1) - k_vec_down(t-1))*rand + k_vec_down(t-1);
                 else
                     k_for_power = k_vec_up(t-1);
                 end
-                P_X_linear(t,n) = W + P_X_linear(t-1,n) * (alpha - k_for_power)^2 + (k_for_power^2) * P_error_estim_zeroAccess(i,t-1,n);
+                P_X_linear(t,n) = W + P_X_linear(t-1,n) * (alpha - k_for_power)^2 + ...
+                    (k_for_power^2 + 2*k_for_power*(alpha - k_for_power)) * P_error_estim_zeroAccess(i,t-1,n);
                 a_zeroAccess = sqrt(P/P_X_linear(t,n)) * x_zeroAccess(i,t,n);
-                
+                P_X_linear_debug(t,n) = a_zeroAccess.^2;
                 %% zero access with modulo : scale the unknown source part using "zooming" factor, and dither and send through the channel
                 
                 curr_zoom = calc_zoom(P_alias,P,P_error_predict_zeroAccess_modulo(i,t,n),snrLin(i));
                 curr_dither = 2*delta*(rand - 0.5);
                 
+                P_X_modulo(t,n) = W + P_X_modulo(t-1,n) * (alpha - k_for_power)^2 + ...
+                    (k_for_power^2 + 2*k_for_power*(alpha - k_for_power)) * P_error_estim_zeroAccess_modulo(i,t-1,n);
+                
                 % combine uncoded transmission sometime
                 if mod(t,uncoded_timesharing_factor) == 0
-                    a_zeroAccess_modulo = sqrt(P/(2*delta))*x_zeroAccess_modulo(i,t,n);
+                    %                     a_zeroAccess_modulo = mod(curr_zoom*x_zeroAccess_modulo(i,t,n) + curr_dither + delta,2*delta) - delta;
+                    a_zeroAccess_modulo = mod(1.03*sqrt(P/P_X_modulo(t,n))*x_zeroAccess_modulo(i,t,n) + delta,2*delta) - delta;
+                    
                 else
-                    a_zeroAccess_modulo = mod(curr_zoom*x_zeroAccess_modulo(i,t,n) + curr_dither + delta,2*delta) - delta;
+                    %                     a_zeroAccess_modulo = mod(curr_zoom*x_zeroAccess_modulo(i,t,n) + curr_dither + delta,2*delta) - delta;
+                    a_zeroAccess_modulo = sqrt(P/P_X_modulo(t,n))*x_zeroAccess_modulo(i,t,n);
+                    
                 end
-                P_X_modulo(t,n) = a_zeroAccess_modulo.^2;
+                P_X_modulo_debug(t,n) = a_zeroAccess_modulo.^2;
                 %% partial access : estimate the noisy control, and then subtract noisy control estimate
                 if strcmp(scale,'randomized')
                     k_for_power = (k_vec_up(t-1) - k_vec_down(t-1))*rand + k_vec_down(t-1);
@@ -174,12 +187,12 @@ for i=1:length(SNR)
                     k_for_power = k_vec_up(t-1);
                 end
                 
-                P_X_partial(t,n) = W + P_X_partial(t-1,n) * (alpha - k_for_power)^2 + (k_for_power^2) * P_error_estim_partialAccess(i,t-1,n);
-                P_X_hat_partial(t,n) = P_X_partial(t,n) + P_error_predict_partialAccess(i,t,n);
+                P_X_partial(t,n) = W + P_X_partial(t-1,n) * (alpha - k_for_power)^2 + (k_for_power^2 + 2*k_for_power*(alpha - k_for_power)) * P_error_estim_partialAccess(i,t-1,n);
+                P_X_hat_partial(t,n) = P_X_partial(t,n) - P_error_predict_partialAccess(i,t,n);
                 
                 if sign_cheat
                     r = sqrt(P/((1-2/pi)*P_X_hat_partial(t,n)))*abs(x_hat_predict_partialAccess(i,t,n)) + sigma_v*randn;
-                    estim_coeff = sqrt((P_X_hat_partial(t,n)/2)/P)*sign(x_hat_predict_partialAccess(i,t,n));
+                    estim_coeff = sqrt((P_X_hat_partial(t,n)*(1-2/pi))/P)*sign(x_hat_predict_partialAccess(i,t,n));
                     x_estim = estim_coeff*r;
                 else
                     r = sqrt(P/P_X_hat_partial(t,n))*x_hat_predict_partialAccess(i,t,n) + sigma_v*randn;
@@ -189,21 +202,22 @@ for i=1:length(SNR)
                 
                 norm_partialAccess = P_error_predict_partialAccess(i,t,n) + estim_coeff^2 * sigma_v^2;
                 a_partialAccess = sqrt(P/norm_partialAccess) * (x_partialAccess(i,t,n) - x_estim);
-                
+                P_X_partial_debug(t,n) = a_partialAccess.^2;
                 %% partial access with feedback : estimate the noisy control after feedback iterations,then subtract noisy control estimate
                 %  feedback is with modulo
                 
                 if sign_cheat
                     [x_final,MSE_final] = feedback_over_awgn(abs(x_hat_predict_partialAccess_feedback(i,t,n)),P,(1-2/pi)*P_X_hat_partial(t,n),SNR(i) + deltaSNR,...
                         -1*deltaSNR,N_feedback,P_alias,'modulo');
-                    norm_partialAccess_feedback = P_error_predict_partialAccess_feedback(i,t,n) + MSE_final;
+                    norm_partialAccess_feedback = 1.12*(P_error_predict_partialAccess_feedback(i,t,n) + MSE_final);
                     a_partialAccess_feedback = sqrt(P/norm_partialAccess_feedback) * (x_partialAccess_feedback(i,t,n) - x_final*sign(x_hat_predict_partialAccess_feedback(i,t,n)));
                 else
                     [x_final,MSE_final] = feedback_over_awgn(x_hat_predict_partialAccess_feedback(i,t,n),P,P_X_hat_partial(t,n),SNR(i) + deltaSNR,...
                         -1*deltaSNR,N_feedback,P_alias,'modulo');
-                    norm_partialAccess_feedback = P_error_predict_partialAccess_feedback(i,t,n) + MSE_final;
+                    norm_partialAccess_feedback = (P_error_predict_partialAccess_feedback(i,t,n) + MSE_final);
                     a_partialAccess_feedback = sqrt(P/norm_partialAccess_feedback) * (x_partialAccess_feedback(i,t,n) - x_final);
                 end
+                P_X_partial_feedback_debug(t,n) = a_partialAccess_feedback.^2;
                 
                 %% partial access with feedback : estimate the noisy control after feedback iterations,then subtract noisy control estimate
                 %  feedback is with linear scaling
@@ -212,15 +226,16 @@ for i=1:length(SNR)
                     [x_final_linear,MSE_final_linear] = feedback_over_awgn(abs(x_hat_predict_partialAccess_feedback_linear(i,t,n)),P,(1-2/pi)*P_X_hat_partial(t,n),SNR(i) + deltaSNR,...
                         -1*deltaSNR,N_feedback,P_alias,'linear');
                     
-                    norm_partialAccess_feedback_linear = P_error_predict_partialAccess_feedback_linear(i,t,n) + MSE_final_linear;
+                    norm_partialAccess_feedback_linear = 1.12*(P_error_predict_partialAccess_feedback_linear(i,t,n) + MSE_final_linear);
                     a_partialAccess_feedback_linear = sqrt(P/norm_partialAccess_feedback_linear) * (x_partialAccess_feedback_linear(i,t,n) - x_final_linear*sign(x_hat_predict_partialAccess_feedback_linear(i,t,n)));
                 else
                     [x_final_linear,MSE_final_linear] = feedback_over_awgn(x_hat_predict_partialAccess_feedback_linear(i,t,n),P,P_X_hat_partial(t,n),SNR(i) + deltaSNR,...
                         -1*deltaSNR,N_feedback,P_alias,'linear');
                     
-                    norm_partialAccess_feedback_linear = P_error_predict_partialAccess_feedback_linear(i,t,n) + MSE_final_linear;
+                    norm_partialAccess_feedback_linear = (P_error_predict_partialAccess_feedback_linear(i,t,n) + MSE_final_linear);
                     a_partialAccess_feedback_linear = sqrt(P/norm_partialAccess_feedback_linear) * (x_partialAccess_feedback_linear(i,t,n) - x_final_linear);
                 end
+                P_X_partial_feedback_linear_debug(t,n) = a_partialAccess_feedback_linear.^2;
             end
             
             %% channel
@@ -257,19 +272,14 @@ for i=1:length(SNR)
                 P_error_estim(i,t,n) = P_error_predict(i,t,n)/(1+snrLin(i));
                 
                 %% zero access linear: recover a CUBE and update estimate
-                zeta = (sqrt(P/P_X_linear(t,n)) / (P + sigma_z^2))*P_error_predict_zeroAccess(i,t,n);
-                y_tilde = zeta*b_zeroAccess;
-                x_hat_estim_zeroAccess(i,t,n) = x_hat_predict_zeroAccess(i,t,n) + y_tilde ;
-                P_error_estim_zeroAccess(i,t,n) = (1 - zeta*sqrt(P/P_X_linear(t,n)))^2*P_error_predict_zeroAccess(i,t,n) + ...
-                    zeta^2 * (sigma_z)^2;
                 
-%                 zeta = sqrt(P/P_X_linear(t,n));
-%                 xi = 1/zeta;% zeta *P_error_predict_zeroAccess(i,t,n) / (zeta^2 * P_error_predict_zeroAccess(i,t,n) + sigma_z^2);
-%                 y_tilde = xi*(b_zeroAccess - zeta * (alpha - k_vec(t-1))*x_hat_estim_zeroAccess(i,t-1,n));
-%                 x_hat_estim_zeroAccess(i,t,n) = x_hat_predict_zeroAccess(i,t,n) + y_tilde ;
-%                 P_error_estim_zeroAccess(i,t,n) = (1 - zeta*xi)^2*P_error_predict_zeroAccess(i,t,n) + ...
-%                     xi^2 * (sigma_z)^2;
-               
+                zeta = sqrt(P/P_X_linear(t,n));
+                xi = zeta *P_error_predict_zeroAccess(i,t,n) / (zeta^2 * P_error_predict_zeroAccess(i,t,n) + sigma_z^2);
+                y_tilde = xi*(b_zeroAccess - zeta * (alpha - k_vec(t-1))*x_hat_estim_zeroAccess(i,t-1,n));
+                x_hat_estim_zeroAccess(i,t,n) = x_hat_predict_zeroAccess(i,t,n) + y_tilde ;
+                P_error_estim_zeroAccess(i,t,n) = (1 - zeta*xi)^2*P_error_predict_zeroAccess(i,t,n) + ...
+                    xi^2 * (sigma_z)^2;
+                
                 %% partial access : update current state estimation
                 gamma = sqrt(P/norm_partialAccess);
                 partial_zeta = gamma*P_error_predict_partialAccess(i,t,n)/(P + (sigma_z)^2);
@@ -281,27 +291,40 @@ for i=1:length(SNR)
                 
                 % handle uncoded transmissions
                 if mod(t,uncoded_timesharing_factor) == 0
-                    
-                    b_tilde = sqrt(2*delta/P) * b_zeroAccess_modulo;
-                    
-                    % update state estimate
-                    x_hat_estim_zeroAccess_modulo(i,t,n) = b_tilde;
-                    P_error_estim_zeroAccess_modulo(i,t,n) = sigma_z^2 * (2*delta/P);
-                    
-                else
-                    alpha_mmse = snrLin(i)/(1+snrLin(i));
-                    % simple lmmse, assume there is no modulo-aliasing
-                    b_tilde = alpha_mmse*b_zeroAccess_modulo - curr_dither - curr_zoom*(alpha - k_vec(t-1))*x_hat_estim_zeroAccess_modulo(i,t-1,n);
+                    %                     alpha_mmse = snrLin(i)/(1+snrLin(i));
+                    %                     b_tilde = alpha_mmse*b_zeroAccess_modulo - curr_dither - curr_zoom*(alpha - k_vec(t-1))*x_hat_estim_zeroAccess_modulo(i,t-1,n);
+                    %                     b_tilde_mod = mod(delta + b_tilde,2*delta) - delta;
+                    %
+                    %                     r_estim = curr_zoom*P_error_predict_zeroAccess_modulo(i,t,n)/(curr_zoom^2*P_error_predict_zeroAccess_modulo(i,t,n) + P/(1+snrLin(i)));
+                    %                     e_hat = r_estim * b_tilde_mod;
+                    %
+                    %                     % update state estimate
+                    %                     x_hat_estim_zeroAccess_modulo(i,t,n) = x_hat_predict_zeroAccess_modulo(i,t,n) + e_hat;
+                    %
+                    %                     P_error_estim_zeroAccess_modulo(i,t,n) = (1 - curr_zoom^2*P_error_predict_zeroAccess_modulo(i,t,n)/(curr_zoom^2*P_error_predict_zeroAccess_modulo(i,t,n) + P/(1+snrLin(i))))^2*P_error_predict_zeroAccess_modulo(i,t,n) + ...
+                    %                         (curr_zoom*P_error_predict_zeroAccess_modulo(i,t,n)/(curr_zoom^2*P_error_predict_zeroAccess_modulo(i,t,n) + P/(1+snrLin(i))))^2 * P/(1 + snrLin(i));
+                    %                     P_error_estim_zeroAccess_modulo(i,t,n) = P_error_estim_zeroAccess_modulo(i,t,n) + P_alias*(2*delta)^2;
+                    zeta_modulo = 1.03*sqrt(P/P_X_modulo(t,n));
+                    b_tilde = b_zeroAccess_modulo - zeta_modulo*(alpha - k_vec(t-1))*x_hat_estim_zeroAccess_modulo(i,t-1,n);
                     b_tilde_mod = mod(delta + b_tilde,2*delta) - delta;
                     
-                    r_estim = curr_zoom*P_error_predict_zeroAccess_modulo(i,t,n)/(curr_zoom^2*P_error_predict_zeroAccess_modulo(i,t,n) + P/(1+snrLin(i)));
+                    r_estim = zeta_modulo*P_error_predict_zeroAccess_modulo(i,t,n)/(zeta_modulo^2*P_error_predict_zeroAccess_modulo(i,t,n) + sigma_z^2);
                     e_hat = r_estim * b_tilde_mod;
                     
-                    %                     % update state estimate
+                    % update state estimate
                     x_hat_estim_zeroAccess_modulo(i,t,n) = x_hat_predict_zeroAccess_modulo(i,t,n) + e_hat;
                     
-                    P_error_estim_zeroAccess_modulo(i,t,n) = (1 - curr_zoom^2*P_error_predict_zeroAccess_modulo(i,t,n)/(curr_zoom^2*P_error_predict_zeroAccess_modulo(i,t,n) + P/(1+snrLin(i))))^2*P_error_predict_zeroAccess_modulo(i,t,n) + ...
-                        (curr_zoom*P_error_predict_zeroAccess_modulo(i,t,n)/(curr_zoom^2*P_error_predict_zeroAccess_modulo(i,t,n) + P/(1+snrLin(i))))^2 * P/(1 + snrLin(i));
+                    P_error_estim_zeroAccess_modulo(i,t,n) = (1 - zeta_modulo^2*P_error_predict_zeroAccess_modulo(i,t,n)/(zeta_modulo^2*P_error_predict_zeroAccess_modulo(i,t,n) + sigma_z^2))^2*P_error_predict_zeroAccess_modulo(i,t,n) + ...
+                        (zeta_modulo*P_error_predict_zeroAccess_modulo(i,t,n)/(zeta_modulo^2*P_error_predict_zeroAccess_modulo(i,t,n) + sigma_z^2))^2 * sigma_z^2;
+                    
+                else
+                    zeta_modulo = sqrt(P/P_X_modulo(t,n));
+                    xi_modulo = zeta_modulo *P_error_predict_zeroAccess_modulo(i,t,n) / (zeta_modulo^2 * P_error_predict_zeroAccess_modulo(i,t,n) + sigma_z^2);
+                    y_tilde_modulo = xi_modulo*(b_zeroAccess_modulo - zeta_modulo * (alpha - k_vec(t-1))*x_hat_estim_zeroAccess_modulo(i,t-1,n));
+                    x_hat_estim_zeroAccess_modulo(i,t,n) = x_hat_predict_zeroAccess_modulo(i,t,n) + y_tilde_modulo ;
+                    P_error_estim_zeroAccess_modulo(i,t,n) = (1 - zeta_modulo*xi_modulo)^2*P_error_predict_zeroAccess_modulo(i,t,n) + ...
+                        xi_modulo^2 * (sigma_z)^2;
+                    
                 end
                 
                 %% partial access with feedback : we assume that the feedback output is perfect, so we just treat it
@@ -318,18 +341,14 @@ for i=1:length(SNR)
             end
             
             %% control generation
-            u_zeroAccess(i,t,n) = -k_vec(t)*x_hat_estim_zeroAccess(i,t,n);
-            u_partialAccess(i,t,n) = -k_vec(t)*x_hat_estim_partialAccess(i,t,n);
-            u_fullAccess(i,t,n) = -k_vec(t)*x_hat_estim_fullAccess(i,t,n);
-            u_partialAccess_feedback(i,t,n) = -k_vec(t)*x_hat_estim_partialAccess_feedback(i,t,n);
-            u_partialAccess_feedback_linear(i,t,n) = -k_vec(t)*x_hat_estim_partialAccess_feedback_linear(i,t,n);
+            k_for_control = k_vec(t); % (k_vec_up(t) - k_vec_down(t))*rand + k_vec_down(t); % k_vec(t);
+            u_zeroAccess(i,t,n) = -k_for_control*x_hat_estim_zeroAccess(i,t,n);
+            u_partialAccess(i,t,n) = -k_for_control*x_hat_estim_partialAccess(i,t,n);
+            u_fullAccess(i,t,n) = -k_for_control*x_hat_estim_fullAccess(i,t,n);
+            u_partialAccess_feedback(i,t,n) = -k_for_control*x_hat_estim_partialAccess_feedback(i,t,n);
+            u_partialAccess_feedback_linear(i,t,n) = -k_for_control*x_hat_estim_partialAccess_feedback_linear(i,t,n);
+            u_zeroAccess_modulo(i,t,n) = -k_for_control*x_hat_estim_zeroAccess_modulo(i,t,n);
             
-            if mod(t,uncoded_timesharing_factor) == 0
-                %                 u_zeroAccess_modulo(i,t,n) = -alpha*x_hat_estim_zeroAccess_modulo(i,t,n);
-                u_zeroAccess_modulo(i,t,n) = -k_vec(t)*x_hat_estim_zeroAccess_modulo(i,t,n);
-            else
-                u_zeroAccess_modulo(i,t,n) = -k_vec(t)*x_hat_estim_zeroAccess_modulo(i,t,n);
-            end
             %% update estimates
             x_hat_predict_fullAccess(i,t+1,n) = alpha*x_hat_estim_fullAccess(i,t,n) + u_fullAccess(i,t,n);
             P_error_predict(i,t+1,n) = alpha^2 * P_error_estim(i,t,n) + W;
@@ -384,9 +403,13 @@ for i=1:length(SNR)
         'Zero Access - kochman zamir',strcat('Partial Access - feedback : ',num2str(N_feedback),' iterations'),...
         strcat('Partial Access - linear feedback : ',num2str(N_feedback),' iterations'),'J_{\infty}');
     
-    powerAnalysis(P_X_linear,1,x_zeroAccess,T,N_avg,'zeroAccess');
-    powerAnalysis(P_X_modulo,1,x_zeroAccess_modulo,T,N_avg,'modulo');
-    powerAnalysis(reshape(P_error_predict,T,N_avg),1,x_fullAccess,T,N_avg,'fullAccess');
+    powerAnalysis(P_X_linear_debug,N_avg,'zeroAccess',sigma_z);
+    powerAnalysis(P_X_full_debug,N_avg,'fullAccess',sigma_z);
+    powerAnalysis(P_X_partial_debug,N_avg,'partialAccess',sigma_z);
+    powerAnalysis(P_X_partial_feedback_debug,N_avg,'feedback',sigma_z);
+    powerAnalysis(P_X_partial_feedback_linear_debug,N_avg,'feedback linear',sigma_z);
+    powerAnalysis(P_X_modulo_debug,N_avg,'modulo',sigma_z);
+    
     
 end
 
@@ -418,18 +441,13 @@ curr_zoom = sqrt((a - b)/c);
 
 end
 
-function [] = powerAnalysis(P_x,P,x,T,N_avg,run)
+function [] = powerAnalysis(P_x,N_avg,run,sigma)
 
-switch run
-    case 'modulo'
-        inputPower = sum(P_x,2)/N_avg;
-    otherwise
-        x_for_Power = reshape(x,T,N_avg);
-        inputPower = sum(sqrt(P./P_x) .* (x_for_Power.^2),2)/N_avg;
-end
+inputPower = sum(P_x,2)/N_avg;
+
 figure;hold all
 plot(inputPower)
-title([run strcat('averagePower = ',num2str(mean(inputPower(2:end-1))))])
+title([run strcat('measured SNR = ',num2str(10*log10(mean(inputPower(2:end-1))/sigma^2)))])
 
 
 

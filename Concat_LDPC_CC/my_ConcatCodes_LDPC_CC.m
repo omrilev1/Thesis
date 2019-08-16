@@ -14,15 +14,15 @@ resultsFileName = strcat('.\results\',date,'TurboIterations_Results');
 
 
 % Init Params
-convCode.constraintLength = [8];
-convCode.rate = [1/2];% [1/4 1/3 2/5 1/2];
+convCode.constraintLength = [10];
+convCode.rate = [1/3 1/4];% [1/4 1/3 2/5 1/2];
 
-turboIterations = [3,2,1,0];
+turboIterations = [0];
 
 decoding_method = [1]; % 0 for LDPC in hard decision , 1 for soft
-dvb_rate = [2/5];%[9/10 5/6 3/4 2/3 2/5 ];
+dvb_rate = [3/4 5/6];%[9/10 5/6 3/4 2/3 2/5 ];
 
-percentDeletions = [0.3 0.2 0.1 0];
+percentDeletions = [0 0.05 0.1 0.15];
 
 blockIntrlvDepth = 256;
 
@@ -39,7 +39,7 @@ BER = zeros(length(EbN0),size(params,2));
 BER_conv = zeros(length(EbN0),size(params,2));
 effectiveRate = zeros(1,size(params,2));
 
-NbitsLDPC = 64800;
+NbitsLDPC = 16200; % 64800
 while cnt<size(params,2)
     curr_iter = params(1,cnt);
     curr_del = params(2,cnt);
@@ -52,7 +52,8 @@ while cnt<size(params,2)
     [poly,tblLen] = convCodeGen(curr_constraintLength,curr_conv_r);
     
     % generate LDPC H matrix
-    H = dvbs2ldpc(curr_LDPC_r);
+%     H = dvbs2ldpc(curr_LDPC_r);
+    H = dvbs2ldpc_custom(curr_LDPC_r,'short');
     ldpc_enc = comm.LDPCEncoder(H);
     if curr_decMethod == 0
         ldpc_dec = comm.LDPCDecoder(H,'DecisionMethod','Hard decision','MaximumIterationCount',63,...

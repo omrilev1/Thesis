@@ -56,11 +56,6 @@ P_error_predict_partialAccess_feedback = zeros(length(SNR),T,N_avg);
 P_error_estim_partialAccess_feedback_linear = zeros(length(SNR),T,N_avg);
 P_error_predict_partialAccess_feedback_linear = zeros(length(SNR),T,N_avg);
 
-P_X_linear = zeros(1,T,N_avg);
-P_X_modulo = zeros(1,T,N_avg);
-
-P_X_hat_linear = zeros(1,T,N_avg);
-P_X_hat_modulo = zeros(1,T,N_avg);
 
 
 

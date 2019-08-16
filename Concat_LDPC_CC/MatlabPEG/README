@@ -1,0 +1,19 @@
+= DESCRIPTION OF CODE
+This MATLAB code is a mex interface for
+C code of Xiao-Yu Hu for generating LDPC
+code using PEG algorithm of Hu and Arnold.
+
+= USAGE
+To use the code compile the mex function by:
+
+>> mex GenerateLDPC_mex.C BigGirth.C CyclesOfGraph.C Random.C GenerateLDPC.C
+
+Then call the function to generate regular LDPC code
+
+>> A = buildLDPCmatrix(252, 504, 3)
+
+
+= AUTHOR
+Hatef Monajemi (monajemi@stanford.edu)
+Stanford University
+
