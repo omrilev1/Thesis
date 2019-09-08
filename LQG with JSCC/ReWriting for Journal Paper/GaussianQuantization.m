@@ -39,7 +39,7 @@ delta_kochman = 2.25;
 beta_kochman = 1.05;
 
 centers = [partition(1) (partition(1:end-1) + partition(2:end))/2 partition(end)];
-Niters = 5*1e4;
+Niters = 1e4;
 
 SDR_Tuncel = zeros(size(snr));
 SDR_Kochman = zeros(size(snr));
@@ -97,18 +97,19 @@ for i=1:length(snr)
         %
         
         % Kochman Zamir
-        TxSig = mod(beta_kochman*x + delta_kochman,2*delta_kochman) - delta_kochman;
+        curr_dither = 0; % 2*delta_kochman*rand - delta_kochman;
+        TxSig = mod(beta_kochman*x + delta_kochman + curr_dither,2*delta_kochman) - delta_kochman;
         RxSig_kochman = TxSig + sqrt(1/snrLin(i))*randn(size(TxSig));
         
-        % Debug - Manual Power Calibration
-%         currenPower = mean(TxSig.^2);
+%         % Debug - Manual Power Calibration
+%               currenPower = mean(TxSig.^2);
 %         figure;
 %         subplot(211); histogram(TxSig); title(strcat('TxSig histogram, E(TxSig^2) = ',num2str(mean(TxSig.^2))));grid on; grid minor;
 %         subplot(212); scatter(rho*x(1:10:end),TxSig(1:10:end)); title('[TxSig,rho*x]');xlabel('rho*x');ylabel('TxSig');grid on; grid minor;
 %         subplot(213); scatter(y(1:10:end),RxSig_kochman(1:10:end)); title(strcat('[RxSig,Y], SNR = ',num2str(snr(i)),'[dB]'));xlabel('y');ylabel('RxSig');grid on; grid minor;
 %         
 %         
-        
+%   
         
         % Hybrid Tuncel BitPipe (Infinite Delay)
         
@@ -139,7 +140,7 @@ for i=1:length(snr)
         curr_SDR_TuncelGenie = curr_SDR_TuncelGenie + sum((x_hat_Tuncel_Genie - x).^2);
         
         % Kochman
-        x_hat_kochman = Kochman_Decoder(RxSig_kochman,y,beta_kochman,delta_kochman,rho,sigmaW);
+        x_hat_kochman = Kochman_Decoder(RxSig_kochman,y,beta_kochman,delta_kochman,rho,sigmaW,curr_dither);
         
         curr_SDR_Kochman = curr_SDR_Kochman + sum((x_hat_kochman - x).^2);
         
@@ -264,9 +265,9 @@ else
 end
 end
 
-function [s_hat] = Kochman_Decoder(RxSig,y,beta,delta,rho,sigmaW)
+function [s_hat] = Kochman_Decoder(RxSig,y,beta,delta,rho,sigmaW,curr_dither)
 
-mod_sig = mod(RxSig - beta*rho*y + delta,2*delta) - delta;
+mod_sig = mod(RxSig - beta*rho*y - curr_dither + delta,2*delta) - delta;
 
 alpha_s = (beta*(1-rho^2)) / (beta^2 * (1-rho^2) + sigmaW^2);
 s_hat = rho*y + alpha_s * mod_sig;
