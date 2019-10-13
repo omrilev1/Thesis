@@ -1,8 +1,8 @@
 %% Simulation of LQG over power AWGN channel, with receiver SI
 % We assume full knowledge of the control signal u_t in the observer, and
-% the existence of receiver SI signal, z_t. 
+% the existence of receiver SI signal, z_t.
 % we simulate 3 cases :
-% - Observer has full access to the SI 
+% - Observer has full access to the SI
 % - Only controller has the control signal
 % - noisy feedback between both
 
@@ -23,6 +23,7 @@ close all; clear all; clc;
 
 % Init parameters and arrays structures
 Params = initParams_Control();
+Params.NumOfSchemes = 3;
 [Results,Debug,PredictErr,EstimErr] = initStructs_Control(Params);
 
 for i=1:length(Params.SNR)
@@ -62,28 +63,34 @@ for i=1:length(Params.SNR)
                 aVec = sqrt(Params.P/Params.W) * xVec;
                 Debug(:,i,t,n) = Params.W;
                 
-                P_X_linear = Params.P; P_X_modulo = Params.P; P_X_Tuncel = Params.P;
+                P_X_linear = Params.P; P_X_Tuncel = Params.P;
                 P_X_modulo_feedback = Params.P; P_X_modulo_feedback_linear = Params.P;
             else
                 %% Full Access : Subtract the receiver SI
                 SI = Params.rho * sqrt(Params.P/PredictErr(1,i,t,n)) * (xVec(1) - xVecPredict(1)) + eta;
-                powerNorm = (1 - Params.rho^2) * PredictErr(1,i,t,n) ; 
-                aVec(1) = sqrt(Params.P/powerNorm)*(xVec(1) - xVecPredict(1) - Params.rho*sqrt(PredictErr(1,i,t,n)/Params.P)*SI);                
+                powerNorm = (1 - Params.rho^2) * PredictErr(1,i,t,n) ;
+                aVec(1) = sqrt(Params.P/powerNorm)*(xVec(1) - xVecPredict(1) - Params.rho*sqrt(PredictErr(1,i,t,n)/Params.P)*SI);
                 
                 %% Linear Precoding :
-                % subtract the last stage receive side prediction, and normalize
-                aVec(2) = sqrt(Params.P/PredictErr(2,i,t,n))*(xVec(2) - xVecPredict(2));
+                % Send X_{t} as is, with proper power normalization
+                curr_k_for_power = Params.k_for_power(t);
+                P_X_linear = Params.W + P_X_linear * (Params.alpha - curr_k_for_power)^2 + ...
+                    (curr_k_for_power^2 + 2*curr_k_for_power*(Params.alpha - curr_k_for_power)) * EstimErr(2,i,t-1,n);
+                aVec(2) = sqrt(Params.P/P_X_linear) * xVec(2);
                 
                 %% Tuncel scheme : quantize and send the quantized value + quantization value after proper scaling
                 % Tuncel coding
+                P_X_Tuncel = Params.W + P_X_Tuncel * (Params.alpha - curr_k_for_power)^2 + ...
+                    (curr_k_for_power^2 + 2*curr_k_for_power*(Params.alpha - curr_k_for_power)) * EstimErr(3,i,t-1,n);
+
                 
-                normX_Tuncel = sqrt(Params.P/PredictErr(3,i,t,n)) * (xVec(3) - xVecPredict(3));
+                normX_Tuncel = sqrt(Params.P/P_X_Tuncel) * xVec(3);
                 currDistance = abs(normX_Tuncel - Params.centersTuncel(:));
                 [~,minIdx] = min(currDistance,[],1);
                 T_Tuncel = Params.codebookTuncel(minIdx);
                 S_Tuncel = normX_Tuncel - T_Tuncel;
                 
-                aVec(3) = Params.alphaTuncel*T_Tuncel + Params.betaTuncel*S_Tuncel;                
+                aVec(3) = Params.alphaTuncel*T_Tuncel + Params.betaTuncel*S_Tuncel;
                 
             end
             Debug(:,i,t,n) = aVec(:).^2;
@@ -93,9 +100,6 @@ for i=1:length(Params.SNR)
             eta = sqrt(1 - Params.rho^2) * randn;
             bVec = aVec + z*ones(Params.NumOfSchemes,1);
             
-            if t>1
-                bVec(5:6) = aVec(5:6);
-            end
             %% controller
             
             % estimation
@@ -105,7 +109,7 @@ for i=1:length(Params.SNR)
             else
                 %% Full Access, Linear Receiver
                 
-                % calc LMMSE Params                
+                % calc LMMSE Params
                 Cxy = [sqrt(Params.P*(1 - Params.rho^2)*PredictErr(1,i,t,n)) Params.rho * sqrt(Params.P*PredictErr(1,i,t,n))];
                 Cyy = [Params.P*(1 + 1/Params.snrLin(i)),0 ; 0,Params.rho^2 * Params.P + (1 - Params.rho^2)];
                 
@@ -116,47 +120,57 @@ for i=1:length(Params.SNR)
                 %% zero Access, Linear Receiver
                 
                 % generate SI
-                SI = Params.rho * aVec(2) + eta;
+                SI = Params.rho * (xVec(2) - xVecPredict(2)) + eta * sqrt(P_X_linear);
                 
-                % calc LMMSE Params                
-                Cxy = [sqrt(Params.P*PredictErr(2,i,t,n)) Params.rho * sqrt(Params.P*PredictErr(2,i,t,n))];
-                Cyy = [Params.P*(1 + 1/Params.snrLin(i)) Params.rho*Params.P ; Params.rho*Params.P Params.rho^2 * Params.P + (1 - Params.rho^2)];
+                % generate the receiver side signals for estimation
+                b_tilde_linear = bVec(2) - sqrt(Params.P/P_X_linear) * xVecPredict(2);
+                
+                % calc LMMSE Params
+                Cxy = [sqrt(Params.P/P_X_linear)*PredictErr(2,i,t,n) Params.rho*PredictErr(2,i,t,n)];
+                Cyy = [Params.P*(1 + 1/Params.snrLin(i)) Params.rho*sqrt(Params.P/P_X_linear)*PredictErr(2,i,t,n) ;...
+                    Params.rho*sqrt(Params.P/P_X_linear)*PredictErr(2,i,t,n) ((Params.rho)^2 * PredictErr(2,i,t,n) + (1 - Params.rho^2)*P_X_linear)];
                 
                 
-                xVecEstim(2) = xVecPredict(2) + Cxy * (Cyy \ [bVec(2);SI]);
-                % EstimErr(1,i,t,n) = 10^(-3.95/20) * PredictErr(1,i,t,n)/(1+Params.snrLin(i));
-                EstimErr(2,i,t,n) = 10^(-1.1/20) * PredictErr(2,i,t,n)/(1+Params.snrLin(i));
+                xVecEstim(2) = xVecPredict(2) + Cxy * (Cyy \ [b_tilde_linear;SI]);
+                EstimErr(2,i,t,n) = 10^(-0.6/20) * PredictErr(2,i,t,n)/(1+Params.snrLin(i)); % SNR = 8[dB];
+                
+                % EstimErr(2,i,t,n) = 10^(-1.5/20) * PredictErr(2,i,t,n)/(1+Params.snrLin(i)); % SNR = 6[dB];
                 
                 %% Zero Access, Tuncel Receiver
-                
-                RxSig_tuncel = bVec(3);
-                SI = Params.rho * normX_Tuncel + eta;
-                
-                T_hat = MMSE_decoder_Int(RxSig_tuncel,SI,Params.deltaTuncel,Params.codebookTuncel,Params.alphaTuncel,Params.betaTuncel,Params.rho,sigma_z);
-                
-                S_hat = MMSE_decoder_Frac(RxSig_tuncel,SI,Params.deltaTuncel,Params.alphaTuncel,Params.betaTuncel,Params.rho,sigma_z,Params.codebookTuncel);
 
-                xVecEstim(3) = xVecPredict(3) + sqrt(PredictErr(3,i,t,n)/Params.P) * (T_hat + S_hat);
-                % EstimErr(4,i,t,n) = 10^(-5.05/20) * PredictErr(4,i,t,n)/(1+Params.snrLin(i));
-                EstimErr(3,i,t,n) = 10^(-2/20) * PredictErr(3,i,t,n)/(1+Params.snrLin(i));
+                RxSig_tuncel = bVec(3);
+                
+                % generate SI
+                SI = Params.rho * xVec(3) + eta * sqrt(P_X_Tuncel);
+                
+                receiverStateSig = (Params.alpha - curr_k_for_power) * xVecEstim(3);
+                
+                T_hat = MMSE_decoder_Int(RxSig_tuncel,SI,Params.deltaTuncel,Params.codebookTuncel,...
+                    Params.alphaTuncel,Params.betaTuncel,Params.rho,sigma_z,P_X_Tuncel,Params.P);
+                
+                S_hat = MMSE_decoder_Frac(RxSig_tuncel,SI,Params.deltaTuncel,Params.alphaTuncel,...
+                    Params.betaTuncel,Params.rho,sigma_z,Params.codebookTuncel,P_X_Tuncel,Params.P);
+                
+                xVecEstim(3) = xVecPredict(3) + sqrt(P_X_Tuncel/Params.P) * (T_hat + S_hat) - receiverStateSig;
+                EstimErr(3,i,t,n) = 10^(-2.65/20) * PredictErr(3,i,t,n)/(1+Params.snrLin(i));
             end
             
             %% control generation
             uVec = -Params.k_vec(t) * xVecEstim;
-
+            
             %% update estimates
             xVecPredict = Params.alpha * xVecEstim + uVec;
             PredictErr(:,i,t+1,n) = Params.alpha^2 * EstimErr(:,i,t,n) + Params.W;
-
+            
             %% Calculate current cost
             if t == 1
-               Results(:,i,t,n) =  Params.Q*xVec.^2 + Params.R*uVec.^2 ;
+                Results(:,i,t,n) =  Params.Q*xVec.^2 + Params.R*uVec.^2 ;
             else
-               Results(:,i,t,n) =  (Results(:,i,t-1,n)*(t-1) + (Params.Q*xVec.^2 + Params.R*uVec.^2))/t;
+                Results(:,i,t,n) =  (Results(:,i,t-1,n)*(t-1) + (Params.Q*xVec.^2 + Params.R*uVec.^2))/t;
             end
-
+            
         end
-                
+        
         if mod(n,50) == 0
             display(strcat('n = ',num2str(n)));
         end
@@ -169,21 +183,21 @@ for i=1:length(Params.SNR)
         currMean = mean(reshape(Results(k,i,:,:),Params.T,[]),2);
         plot(1:(Params.T-1),10*log10(currMean(1:end-1)),lineStyle(k),'LineWidth',2)
     end
-        % Bound From Toli Paper
-        plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + ((Params.Q + (Params.alpha^2-1)*Params.s_vec(2))/((1+Params.snrLin(i))/(1 - Params.rho^2)-Params.alpha^2))*Params.W)*ones(1,Params.T),'-m','LineWidth',2)
-        
-        % Bound from Stravou Paper
-        R_ch = 0.5*log(1 + Params.snrLin(i));
-        tau = Params.rho^2 * Params.W + (1 - Params.rho^2) - Params.alpha^2 * (1 - Params.rho^2)/(exp(2*R_ch));
-        D = (sqrt(tau^2 + 4*Params.alpha^2*Params.rho^2*(1 - Params.rho^2)*Params.W / exp(2*R_ch)) - tau)/(2*Params.alpha^2*Params.rho^2);
-        plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + (Params.Q + (Params.alpha^2-1)*Params.s_vec(2)) * D)*ones(1,Params.T),'--','LineWidth',2.5)
-
+    % Bound From Toli Paper
+    plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + ((Params.Q + (Params.alpha^2-1)*Params.s_vec(2))/((1+Params.snrLin(i))/(1 - Params.rho^2)-Params.alpha^2))*Params.W)*ones(1,Params.T),'-m','LineWidth',2)
+    
+    % Bound from Stravou Paper
+    R_ch = 0.5*log(1 + Params.snrLin(i));
+    tau = Params.rho^2 * Params.W + (1 - Params.rho^2) - Params.alpha^2 * (1 - Params.rho^2)/(exp(2*R_ch));
+    D = (sqrt(tau^2 + 4*Params.alpha^2*Params.rho^2*(1 - Params.rho^2)*Params.W / exp(2*R_ch)) - tau)/(2*Params.alpha^2*Params.rho^2);
+    plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + (Params.Q + (Params.alpha^2-1)*Params.s_vec(2)) * D)*ones(1,Params.T),'--','LineWidth',2.5)
+    
     grid on; grid minor;
     xlabel('t'); ylabel('cost [dB]');
     legend('Observer is Linear',...
         strcat('Observer With Tuncel : \alpha = ',num2str(Params.alphaTuncel),' \beta = ',num2str(Params.betaTuncel)),...
         'SI in Tx and Rx','LQG_{\infty} With Tx and Rx SI','Starvou Bound');
-%         strcat('Linear reversed feedback : ',num2str(Params.N_feedback),' iterations'),'SDR OPTA');
+    %         strcat('Linear reversed feedback : ',num2str(Params.N_feedback),' iterations'),'SDR OPTA');
     
     title(strcat('SNR = ',num2str(Params.SNR),'[dB], SI Correlation is ',num2str(Params.rho)))
     powerAnalysis(reshape(Debug(1,i,:,:),Params.T,[]),Params.N_avg,'SI Known to Tx and Rx',sigma_z)
@@ -203,7 +217,7 @@ title([run strcat('measured SNR = ',num2str(10*log10(mean(inputPower(2:end-1))/s
 
 end
 
-function [T_hat] = MMSE_decoder_Int(RxSig_tuncel,y,delta,codebook,alpha,beta,rho,sigmaW)
+function [T_hat] = MMSE_decoder_Int(RxSig_tuncel,y,delta,codebook,alpha,beta,rho,sigmaW,P_x,P)
 
 ds = 0.001;
 s = -delta/2:ds:delta/2;
@@ -212,8 +226,8 @@ s = -delta/2:ds:delta/2;
 calc1 = codebook(:) + s;
 calc2 = alpha*codebook(:) + beta*s;
 
-expTerm1 = -1*(0.5*(calc1).^2);
-expTerm2 = - (0.5/(1-rho^2))*(y - rho*calc1).^2;
+expTerm1 = -1*(0.5*(calc1/sqrt(P)).^2);
+expTerm2 = - (0.5/(P_x * (1-rho^2)))*(y - rho*sqrt(P/P_x)*calc1).^2;
 expTerm3 = 0.5*(1/sigmaW^2)*(RxSig_tuncel - calc2).^2;
 
 Integrand = exp(expTerm1 + expTerm2 - expTerm3);
@@ -226,7 +240,7 @@ T_hat = sum(codebook(:).*num(:),1)./sum(num(:));
 % T_hat = codebook(minIdx);
 end
 
-function [S_hat] = MMSE_decoder_Frac(RxSig_tuncel,y,delta,alpha,beta,rho,sigmaW,codebook)
+function [S_hat] = MMSE_decoder_Frac(RxSig_tuncel,y,delta,alpha,beta,rho,sigmaW,codebook,P_x,P)
 
 
 ds = 0.001;
@@ -236,8 +250,8 @@ s = ones(length(codebook),1) * (-delta/2:ds:delta/2);
 calc1 = codebook(:) + s;
 calc2 = alpha*codebook(:) + beta*s;
 
-expTerm1 = -1*(0.5*(calc1).^2);
-expTerm2 = - (0.5/(1-rho^2))*(y - rho*calc1).^2;
+expTerm1 = -1*(0.5*(calc1/sqrt(P)).^2);
+expTerm2 = - (0.5/(P_x * (1-rho^2)))*(y - rho*sqrt(P/P_x)*calc1).^2;
 expTerm3 = 0.5*(1/sigmaW^2)*(RxSig_tuncel - calc2).^2;
 Integrand = exp(expTerm1 + expTerm2 - expTerm3);
 

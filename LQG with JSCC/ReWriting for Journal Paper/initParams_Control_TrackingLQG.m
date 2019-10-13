@@ -1,4 +1,4 @@
-function [Params] = initParams_Control()
+function [Params] = initParams_Control_TrackingLQG()
 % Parameters initialization tracking
 
 %% model coefficients
@@ -11,19 +11,10 @@ Params.P_timesharing = Params.P;    % Power during uncoded transmission in time-
 Params.Q = 1;                       % LQG Cost parameters
 Params.R = 5;                       % LQG Cost parameters
 
-Params.ratio_up = 3;                % Control Cost Uncertainity - upper limit
-Params.ratio_down = 1/3;            % Control Cost Uncertainity - upper limit
-Params.scale = 'randomized';        % Scaling Method : 'randomized','worst_case'
 
 % calculate LQG parameters
 [Params.k_vec,Params.s_vec] = calcLQG(Params.Q,Params.R,Params.T,Params.alpha);
-Params.k_vec_up = calcLQG(Params.Q,Params.Q*Params.ratio_up,Params.T,Params.alpha);
-Params.k_vec_down = calcLQG(Params.Q,Params.Q*Params.ratio_down,Params.T,Params.alpha);
-if strcmp(Params.scale,'randomized')
-    Params.k_for_power = (Params.k_vec_up - Params.k_vec_down).*rand(1,Params.T-1) + Params.k_vec_down;
-else
-    Params.k_for_power = Params.k_vec_up;
-end
+ Params.k_for_power = Params.k_vec;
 
 Params.SNR = 8;  % 14              % Direct channel SNR
 Params.deltaSNR = -1;  % 8          % Delta between feedback path and direct path
