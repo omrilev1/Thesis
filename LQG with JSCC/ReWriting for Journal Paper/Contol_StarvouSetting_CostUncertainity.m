@@ -111,7 +111,7 @@ for i=1:length(Params.SNR)
                 
                 % calc LMMSE Params
                 Cxy = [sqrt(Params.P*(1 - Params.rho^2)*PredictErr(1,i,t,n)) Params.rho * sqrt(Params.P*PredictErr(1,i,t,n))];
-                Cyy = [Params.P*(1 + 1/Params.snrLin(i)),0 ; 0,Params.rho^2 * Params.P + (1 - Params.rho^2)];
+                Cyy = [Params.P*(1 +  1/Params.snrLin(i)),0 ; 0,Params.rho^2 * Params.P + (1 - Params.rho^2)];
                 
                 xVecEstim(1) = xVecPredict(1) + Cxy * (Cyy \ [bVec(1);SI]);
                 % EstimErr(1,i,t,n) = 10^(-3.95/20) * PredictErr(1,i,t,n)/(1+Params.snrLin(i));
@@ -126,33 +126,40 @@ for i=1:length(Params.SNR)
                 b_tilde_linear = bVec(2) - sqrt(Params.P/P_X_linear) * xVecPredict(2);
                 
                 % calc LMMSE Params
-                Cxy = [sqrt(Params.P/P_X_linear)*PredictErr(2,i,t,n) Params.rho*PredictErr(2,i,t,n)];
-                Cyy = [Params.P*(1 + 1/Params.snrLin(i)) Params.rho*sqrt(Params.P/P_X_linear)*PredictErr(2,i,t,n) ;...
-                    Params.rho*sqrt(Params.P/P_X_linear)*PredictErr(2,i,t,n) ((Params.rho)^2 * PredictErr(2,i,t,n) + (1 - Params.rho^2)*P_X_linear)];
-                
+%                Cxy = [sqrt(Params.P/P_X_linear)*PredictErr(2,i,t,n) Params.rho*PredictErr(2,i,t,n)];
+%                Cyy = [Params.P*(1 + 1/Params.snrLin(i)) Params.rho*sqrt(Params.P/P_X_linear)*PredictErr(2,i,t,n) ;...
+%                     Params.rho*sqrt(Params.P/P_X_linear)*PredictErr(2,i,t,n) ((Params.rho)^2 * PredictErr(2,i,t,n) + (1 - Params.rho^2)*P_X_linear)];
+               Cxy = PredictErr(2,i,t,n) * [sqrt(Params.P/P_X_linear) Params.rho];
+               Cyy = [Params.P*(PredictErr(2,i,t,n)/P_X_linear + 1/Params.snrLin(i)) Params.rho*sqrt(Params.P/P_X_linear)*PredictErr(2,i,t,n) ;...
+                    Params.rho*sqrt(Params.P/P_X_linear)*PredictErr(2,i,t,n) ((Params.rho)^2 * PredictErr(2,i,t,n) + P_X_linear*(1 - Params.rho^2))]; 
+
                 
                 xVecEstim(2) = xVecPredict(2) + Cxy * (Cyy \ [b_tilde_linear;SI]);
-                EstimErr(2,i,t,n) = 10^(-0.6/20) * PredictErr(2,i,t,n)/(1+Params.snrLin(i)); % SNR = 8[dB];
                 
-                % EstimErr(2,i,t,n) = 10^(-1.5/20) * PredictErr(2,i,t,n)/(1+Params.snrLin(i)); % SNR = 6[dB];
-                
+                EstimErr(2,i,t,n) = PredictErr(2,i,t,n) - Cxy * (Cyy \ Cxy.');
+%                 EstimErr(2,i,t,n) = 10^(-2.2/20) * EstimErr(2,i,t,n); % Randomization, 8[dB]
+                EstimErr(2,i,t,n) = 10^(-2.85/20) * EstimErr(2,i,t,n); % Worst Case, 8[dB]
+
                 %% Zero Access, Tuncel Receiver
 
                 RxSig_tuncel = bVec(3);
                 
                 % generate SI
-                SI = Params.rho * xVec(3) + eta * sqrt(P_X_Tuncel);
+%                 SI = Params.rho * xVec(3) + eta * sqrt(P_X_Tuncel);
+%                 receiverStateSig = (Params.alpha - curr_k_for_power) * xVecEstim(3);
+%                x_hat_Tuncel = FullMMSE_decoder(RxSig_tuncel,SI,Params.alphaTuncel,Params.betaTuncel,Params.rho,sigma_z,...
+%                     Params.codebookTuncel,Params.centersTuncel(:),ones(size(Params.codebookTuncel)),P_X_Tuncel,Params.P);
+%                 
+%                 xVecEstim(3) = xVecPredict(3) + sqrt(P_X_Tuncel/Params.P) * (x_hat_Tuncel) - receiverStateSig;
+%                EstimErr(3,i,t,n) = 10^(-1/20) * (1 - Params.rho^2) * PredictErr(3,i,t,n)/(1 + (1 - Params.rho^2) * Params.snrLin(i));
+
+                SI = Params.rho * normX_Tuncel + eta;
+               x_hat_Tuncel = FullMMSE_decoder(RxSig_tuncel,SI,Params.alphaTuncel,Params.betaTuncel,Params.rho,sigma_z,...
+                    Params.codebookTuncel,Params.centersTuncel(:),ones(size(Params.codebookTuncel)));
                 
-                receiverStateSig = (Params.alpha - curr_k_for_power) * xVecEstim(3);
+                xVecEstim(3) = sqrt(P_X_Tuncel/Params.P)* (x_hat_Tuncel);   
                 
-                T_hat = MMSE_decoder_Int(RxSig_tuncel,SI,Params.deltaTuncel,Params.codebookTuncel,...
-                    Params.alphaTuncel,Params.betaTuncel,Params.rho,sigma_z,P_X_Tuncel,Params.P);
-                
-                S_hat = MMSE_decoder_Frac(RxSig_tuncel,SI,Params.deltaTuncel,Params.alphaTuncel,...
-                    Params.betaTuncel,Params.rho,sigma_z,Params.codebookTuncel,P_X_Tuncel,Params.P);
-                
-                xVecEstim(3) = xVecPredict(3) + sqrt(P_X_Tuncel/Params.P) * (T_hat + S_hat) - receiverStateSig;
-                EstimErr(3,i,t,n) = 10^(-2.65/20) * PredictErr(3,i,t,n)/(1+Params.snrLin(i));
+               EstimErr(3,i,t,n) = 10^(-1/20) * (1 - Params.rho^2)/(1 + (1 - Params.rho^2) * Params.snrLin(i));
             end
             
             %% control generation
@@ -185,21 +192,17 @@ for i=1:length(Params.SNR)
     end
     % Bound From Toli Paper
     plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + ((Params.Q + (Params.alpha^2-1)*Params.s_vec(2))/((1+Params.snrLin(i))/(1 - Params.rho^2)-Params.alpha^2))*Params.W)*ones(1,Params.T),'-m','LineWidth',2)
-    
-    % Bound from Stravou Paper
-    R_ch = 0.5*log(1 + Params.snrLin(i));
-    tau = Params.rho^2 * Params.W + (1 - Params.rho^2) - Params.alpha^2 * (1 - Params.rho^2)/(exp(2*R_ch));
-    D = (sqrt(tau^2 + 4*Params.alpha^2*Params.rho^2*(1 - Params.rho^2)*Params.W / exp(2*R_ch)) - tau)/(2*Params.alpha^2*Params.rho^2);
-    plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + (Params.Q + (Params.alpha^2-1)*Params.s_vec(2)) * D)*ones(1,Params.T),'--','LineWidth',2.5)
+    plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + ((Params.Q + (Params.alpha^2-1)*Params.s_vec(2))/((1+10^(0.15/20)*(1 - Params.rho^2)*Params.snrLin(i))/(1 - Params.rho^2)-Params.alpha^2))*Params.W)*ones(1,Params.T),'-','LineWidth',2)
+    plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + ((Params.Q + (Params.alpha^2-1)*Params.s_vec(2))/((1+10^(3.05/20)*((1 - Params.rho^2))*Params.snrLin(i))/(1 - Params.rho^2)-Params.alpha^2))*Params.W)*ones(1,Params.T),'-','LineWidth',2)
     
     grid on; grid minor;
     xlabel('t'); ylabel('cost [dB]');
     legend('Observer is Linear',...
         strcat('Observer With Tuncel : \alpha = ',num2str(Params.alphaTuncel),' \beta = ',num2str(Params.betaTuncel)),...
-        'SI in Tx and Rx','LQG_{\infty} With Tx and Rx SI','Starvou Bound');
+        'SI in Tx and Rx','LQG_{\infty} With Tx and Rx SI','LQG_{\infty} With Rx SI and Linear Encoder','LQG_{\infty} With Rx SI and Modulo Encoder');
     %         strcat('Linear reversed feedback : ',num2str(Params.N_feedback),' iterations'),'SDR OPTA');
     
-    title(strcat('SNR = ',num2str(Params.SNR),'[dB], SI Correlation is ',num2str(Params.rho)))
+    title(strcat('SNR = ',num2str(Params.SNR),'[dB], SI noise is \sigma^{2}_z = ',num2str(1)))
     powerAnalysis(reshape(Debug(1,i,:,:),Params.T,[]),Params.N_avg,'SI Known to Tx and Rx',sigma_z)
     powerAnalysis(reshape(Debug(2,i,:,:),Params.T,[]),Params.N_avg,'Linear Precoding',sigma_z)
     powerAnalysis(reshape(Debug(3,i,:,:),Params.T,[]),Params.N_avg,'Tuncel',sigma_z)
@@ -259,6 +262,31 @@ Integrand = exp(expTerm1 + expTerm2 - expTerm3);
 num = sum(sum(Integrand.*s,2),1);
 den = sum(sum(Integrand));
 S_hat = num/den;
+
+end
+
+function [X_hat] = FullMMSE_decoder(RxSig,y,alpha,beta,rho,sigmaW,codebook,centers,probs)
+
+dx = 0.001;
+x = (-8:dx:8);
+
+% start with 2D calculations
+currDistance = abs(x - centers(:));
+[~,minIdx] = min(currDistance,[],1);
+T = codebook(minIdx);
+S = x - T;
+
+% Tuncel 
+f_x = alpha*T + beta*probs(minIdx).*S;
+
+expTerm1 = -1*(0.5*(x).^2);
+expTerm2 = - (0.5/(1-rho^2))*(y - rho*x).^2;
+expTerm3 = - 0.5*(1/sigmaW^2)*(RxSig - f_x).^2;
+Integrand = exp(expTerm1 + expTerm2 + expTerm3);
+
+num = sum(Integrand.*x,2);
+den = sum(Integrand);
+X_hat = num/den;
 
 end
 

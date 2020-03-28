@@ -1,10 +1,10 @@
-function [Params] = initParams_Control()
+function [Params] = initParams_LQGtracking()
 % Parameters initialization tracking
 
 %% model coefficients
 Params.alpha = 2;                   % Gauss markov memory parameter
 Params.W = 1;                       % input gaussian variance
-Params.T = 2^8;                     % Horizon
+Params.T = 2^10;                     % Horizon
 Params.P = 1;                       % power constraint normalized to 1
 Params.P_timesharing = Params.P;    % Power during uncoded transmission in time-sharing
 
@@ -12,36 +12,32 @@ Params.Q = 5;                       % LQG Cost parameters
 Params.R = 1;                       % LQG Cost parameters
 
 Params.ratio_up = 3;                % Control Cost Uncertainity - upper limit
-Params.ratio_down = 1/3;            % Control Cost Uncertainity - upper limit
-Params.scale = 'worst_case';        % Scaling Method : 'randomized','worst_case'
+Params.ratio_down = 1/3;              % Control Cost Uncertainity - upper limit
+Params.scale = 'randomized';        % Scaling Method : 'randomized','worst_case'
 
 % calculate LQG parameters
-[Params.k_vec,Params.s_vec] = calcLQG(Params.Q,Params.R,Params.T,Params.alpha);
-Params.k_vec_up = calcLQG(Params.Q,Params.Q*Params.ratio_up,Params.T,Params.alpha);
-Params.k_vec_down = calcLQG(Params.Q,Params.Q*Params.ratio_down,Params.T,Params.alpha);
+Qmat = Params.Q * [1 0;0 1]; Rmat = Params.R * [1 0;0 1]; 
+Params.Amat = [Params.alpha 0;-1 1]; Params.Bmat = [1;0];
+[Params.k_mat,Params.s_mat,Params.M_mat] = calcLQG_vector(Qmat,Params.R,Params.T,Params.Amat,Params.Bmat);
+[Params.k_mat_up,~,~] = calcLQG_vector(Qmat,Params.R*Params.ratio_up,Params.T,Params.Amat,Params.Bmat);
+[Params.k_mat_down,~,~] = calcLQG_vector(Qmat,Params.R*Params.ratio_down,Params.T,Params.Amat,Params.Bmat);
 if strcmp(Params.scale,'randomized')
-    Params.k_for_power = (Params.k_vec_up - Params.k_vec_down).*rand(1,Params.T-1) + Params.k_vec_down;
+    Params.k_for_power = (Params.k_mat_up - Params.k_mat_down).*rand(1,2,Params.T-1) + Params.k_mat_down;
 else
-    Params.k_for_power = Params.k_vec_up;
+    Params.k_for_power = Params.k_mat_up;
 end
 
-Params.SNR = 6;  % 8              % Direct channel SNR
+Params.SNR = 9;  % 8              % Direct channel SNR
 Params.deltaSNR = -1;  % 8          % Delta between feedback path and direct path
 Params.snrLin = 10.^(Params.SNR/10);
 Params.snrFeedback_Lin = 10.^((Params.SNR + Params.deltaSNR)/10);
 
 Params.rho = 0.9; % correlation of receiver side informaiton
 
+Params.maxRefInput = 0.4; % unknown step input is in the interval [-maxRefInput,maxRefInput]
 %% Transmission scheme parameters
-Params.deltaKochman = 3.8; % sqrt(3*Params.P);
-Params.gammaKochman = 1.025;
 
 Params.sign_cheat = 0; % to transmit in the feedback path only the absolute value, with half of the power
-
-% set timesharing parameters - we need to scale the powers to the overall
-% avergae power will be P
-Params.uncoded_timesharing_factor = 2;
-
 
 Params.P_alias = 9*1e-3;        % Aliasing probability for Kochman- Encoder
 Params.N_feedback = 4;  % 4        % Number of feedback iteration over 1 control samples
@@ -54,7 +50,7 @@ Params.alphaTuncel    = 0.75;% 0.75;             %  Tuncel scheme parameters
 Params.betaTuncel     = -1.18;% -1.18;           % Tuncel scheme parameters;
 
 %% Simulation parameters
-Params.N_avg = 1024;
+Params.N_avg = 64;
 Params.NumOfSchemes = 8;
 % Dictionary :
 % 1 = FullAccess
@@ -98,17 +94,20 @@ curX = x(curIdx);
 codebook = [codebook sum(curX.*curPDF)];
 end
 
-function [k_vec,s_vec] = calcLQG(Q,R,T,alpha)
+function [k_mat,s_mat,M_mat] = calcLQG_vector(Q,R,T,A,B)
 % calculate k
-k_vec = zeros(1,T-1);
-s_vec = zeros(1,T-1);
+k_mat = zeros(1,2,T-1);
+s_mat = zeros(2,2,T-1);
+M_mat = zeros(2,2,T-1);
+
 for t=T:-1:2
     if t==T
-        s_vec(t) = Q;
-        k_vec(t-1) = alpha*s_vec(t)/(s_vec(t) + R);
+        s_mat(:,:,t) = Q;
+        k_mat(:,:,t-1) = (B'*s_mat(:,:,t)*A) / (B'*s_mat(:,:,t)*B + R);
     else
-        s_vec(t) = ((alpha^2)*R*s_vec(t+1))/(s_vec(t+1) + R) + Q;
-        k_vec(t-1) = alpha*s_vec(t)/(s_vec(t) + R);
+        M_mat(:,:,t) = (A'*s_mat(:,:,t+1)*B) * (B'*s_mat(:,:,t+1)*A)/(R + B'*s_mat(:,:,t+1)*B);
+        s_mat(:,:,t) = A'*s_mat(:,:,t+1)*A - (A'*s_mat(:,:,t+1)*B) * (B'*s_mat(:,:,t+1)*A)/(R + B'*s_mat(:,:,t+1)*B) + Q;
+        k_mat(:,:,t-1) = (B'*s_mat(:,:,t)*A) / (B'*s_mat(:,:,t)*B + R);
     end
 end
 end

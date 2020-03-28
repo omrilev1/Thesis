@@ -1,102 +1,29 @@
-% Testing several transmission schemes of gaussian source where the
-% receiver is equipped with side information
-% - Regular Scaling and analog transmission
-% - Tuncel Scheme, where we send the quantized value + quantization error,
-% and use MMSE decoder in the reciever
-% - Tuncel scheme, where the receiver knows T in a "genie aided" manner.
-% (Upper bound on the optimal performance)
-
-% We also plot the results of linear scheme with Tx Side information -
-% acheieves the SDR OPTA  = (1 + SNR/(1-rho^2))
 
 clear all; clc;
-
-% uniform quantizer
-delta = 3.15;% 1.5/sqrt(2);
-type = 'centroid';
-partition = (-6.5:1:6.5)*delta;
-switch type
-    case 'regular'
-        codebook = (-7:1:7)*delta;
-    case 'centroid'
-        [codebook,~] = generateGaussianCodeBook(partition);
-        %probs = [logspace(log(1e-3),log(1.15),(length(codebook) - 1)/2) 1 fliplr(logspace(log(1e-3),log(1.15),(length(codebook) - 1)/2))];
-        probs = [logspace(log(1e-3),log(1.15),(length(codebook) - 1)/2) 1 fliplr(logspace(log(1e-3),log(1.15),(length(codebook) - 1)/2))];
-end
 
 N = 1;
 P = 1;
 rho = 0.9;
 snr = 7:1:16;
-alpha = 0.8;% 0.8;
-beta = -1.15;% -1.15;
 
-% improved tuncel
-alpha_tilde = 0.77;% 0.75;
-beta_tilde = -1.15;% -1.155;
 
-delta_kochman = 2.25;
-beta_kochman = 1.05;
+delta = 2.25;
+beta = 1.05;
 
-centers = [partition(1) (partition(1:end-1) + partition(2:end))/2 partition(end)];
 Niters = 1e4;
 
-SDR_Tuncel = zeros(size(snr));
 SDR_Kochman = zeros(size(snr));
 SDR_Tent = zeros(size(snr));
 SDR_Linear = zeros(size(snr));
-SDR_TuncelGenie = zeros(size(snr));
-SDR_TuncelImproved = zeros(size(snr));
-SDR_TuncelImproved_Genie = zeros(size(snr));
-SDR_TuncelImproved_FullMMSE = zeros(size(snr));
-SDR_Tuncel_FullMMSE = zeros(size(snr));
 
-MSE_T_Tuncel = zeros(size(snr));
-MSE_T_TuncelImp = zeros(size(snr));
-MSE_S_Tuncel = zeros(size(snr));
-MSE_S_TuncelImp = zeros(size(snr));
-
-Bias_Tuncel = zeros(size(snr));
-Rho_Tuncel = zeros(size(snr));
 
 snrLin = 10.^(snr/10);
 for i=1:length(snr)
     
-    curr_SDR_Tuncel = 0;
     curr_SDR_Linear = 0;
-    curr_SDR_TuncelGenie = 0;
     curr_SDR_Kochman = 0;
     curr_SDR_Tent = 0;
-    
-    curr_SDR_Tuncel_Improved = 0;
-    curr_SDR_Tuncel_Improved_Genie = 0;
-    curr_SDR_Tuncel_Improved_FullMMSE = 0;
-    curr_SDR_Tuncel_FullMMSE = 0;
-    curr_SDR_Tent = 0;
-    
-    curr_Bias_Tuncel = 0;
-    curr_rho_Tuncel = 0;
-    curr_Bias_Tuncel_Improved = 0;
-    curr_rho_Tuncel_Improved = 0;
-    Tdist = zeros(1,Niters); Sdist = zeros(1,Niters);
-    
-    errTuncel = zeros(1,Niters);
-    errGenie = zeros(1,Niters);
-    errTuncelImp = zeros(1,Niters);
-    errTuncelImpGenie = zeros(1,Niters);
-    
-    Terr_Tuncel = zeros(1,Niters);
-    Terr_TuncelImp = zeros(1,Niters);
-    ErrTuncel = zeros(1,Niters);
-    corrTuncel = zeros(1,Niters);
-    
-    Serr_Tuncel = zeros(1,Niters);
-    Serr_TuncelImp = zeros(1,Niters);
-    
-    % solve current optimization problem
-    %         [probsOptim,cost] = findBestBeta(alpha_tilde,delta,codebook(6:10),rho,10^(snr(i)/10));
-    %         probs(6:10) = -1*probsOptim;
-    %         beta_tilde = 1;
+
     for n=1:Niters
         
         %% Generate source + side information
@@ -104,59 +31,20 @@ for i=1:length(snr)
         n_tilde = sqrt(P - rho^2)*randn(1,N);
         y = rho*x + n_tilde;
         w = (1/sqrt(snrLin(i)))*randn(size(x));
+        
         %% Encoding + Channel
         % linear
         RxSig_linear = x + w;
         
-        % Tuncel
-        currDistance = abs(x - centers(:));
-        [~,minIdx] = min(currDistance,[],1);
-        T = codebook(minIdx);
-        S = x - T;
-        
-        TxSig = alpha*T + beta*S;
-        RxSig_tuncel = TxSig + w;
-        
-        % Debug - Manual Power Calibration
-        %                currenPower = mean(TxSig.^2);
-        %                 figure;
-        %                 subplot(221); histogram(S); title(strcat('S part histogram, E(s^2) = ',num2str(mean(S.^2))));grid on; grid minor;
-        %                 subplot(222); histogram(TxSig); title(strcat('TxSig histogram, E(TxSig^2) = ',num2str(mean(TxSig.^2))));grid on; grid minor;
-        %                 subplot(223); scatter(rho*x(1:10:end),TxSig(1:10:end)); title('[TxSig,rho*x]');xlabel('rho*x');ylabel('TxSig');grid on; grid minor;
-        %                 subplot(224); scatter(y(1:10:end),RxSig_tuncel(1:10:end)); title(strcat('[RxSig,Y], SNR = ',num2str(snr(i)),'[dB]'));xlabel('y');ylabel('RxSig');grid on; grid minor;
-        %
-        % Tuncel Improved
-        TxSig = alpha_tilde*T + beta_tilde*probs(minIdx).*S;
-        RxSig_tuncelImproved = TxSig + w;
-        
-        % Debug - Manual Power Calibration
-        currenPowerImp = mean(TxSig.^2);
-        %                         figure;
-        %                         subplot(221); histogram(S); title(strcat('S part histogram, E(s^2) = ',num2str(mean(S.^2))));grid on; grid minor;
-        %                         subplot(222); histogram(TxSig); title(strcat('TxSig histogram, E(TxSig^2) = ',num2str(mean(TxSig.^2))));grid on; grid minor;
-        %                         subplot(223); scatter(rho*x(1:100:end),TxSig(1:100:end)); title('[TxSig,rho*x]');xlabel('rho*x');ylabel('TxSig');grid on; grid minor;
-        %                         subplot(224); scatter(y(1:100:end),RxSig_tuncel(1:100:end)); title(strcat('[RxSig,Y], SNR = ',num2str(snr(i)),'[dB]'));xlabel('y');ylabel('RxSig');grid on; grid minor;
-        %
-        
-        % Kochman Zamir
-        curr_dither = 0; % 2*delta_kochman*rand - delta_kochman;
-        TxSig = mod(beta_kochman*x + delta_kochman + curr_dither,2*delta_kochman) - delta_kochman;
+        % Kochman Zamir (simple modulo)
+        TxSig = mod(beta*x + delta,2*delta) - delta;
         RxSig_kochman = TxSig + w;
         
         % Tent Mapping
-        TxSig = mod(beta_kochman*x + delta_kochman,2*delta_kochman) - delta_kochman;
-        
         tent_idx = find(mod(round((beta_kochman*x - TxSig)/(2*delta_kochman)),2) == 1);
         TxSig(tent_idx) = -1*TxSig(tent_idx);
         RxSig_tent = TxSig + w;
-        % Debug - Manual Power Calibration
-        %         currenPower = mean(TxSig.^2);
-        %         figure;
-        %         subplot(211); histogram(TxSig); title(strcat('TxSig histogram, E(TxSig^2) = ',num2str(mean(TxSig.^2))));grid on; grid minor;
-        %         subplot(212); scatter(rho*x(1:10:end),TxSig(1:10:end)); title('[TxSig,rho*x]');xlabel('rho*x');ylabel('TxSig');grid on; grid minor;
-        %         subplot(213); scatter(y(1:10:end),RxSig_kochman(1:10:end)); title(strcat('[RxSig,Y], SNR = ',num2str(snr(i)),'[dB]'));xlabel('y');ylabel('RxSig');grid on; grid minor;
-        %
-        
+
         %% Decoding
         %% linear
         x_hat = ((rho/snrLin(i))*y + (1-rho^2)*RxSig_linear)/(1 + 1/snrLin(i) - rho^2);
@@ -181,8 +69,6 @@ for i=1:length(snr)
         x_hat_Tuncel = FullMMSE_decoder(RxSig_tuncel,y,alpha,beta,rho,sigmaW,codebook,centers,ones(size(probs)));
         
         curr_SDR_Tuncel_FullMMSE = curr_SDR_Tuncel_FullMMSE + sum((x_hat_Tuncel - x).^2);
-        ErrTuncel(n) = x_hat_Tuncel - x;
-        corrTuncel(n) = x_hat_Tuncel*ErrTuncel(n);
         %         curr_Bias_Tuncel_FullMMSE = curr_Bias_Tuncel_FullMMSE + x_hat_Tuncel - x ;
         %         curr_rho_Tuncel_FullMMSE = curr_rho_Tuncel_FullMMSE + x*(x_hat_Tuncel - x);
         

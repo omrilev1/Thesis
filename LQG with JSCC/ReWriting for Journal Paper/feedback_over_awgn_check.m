@@ -2,10 +2,10 @@ close all; clear all; clc;
 % channel with feedback try
 
 
-snr = [6]; % snr to check
+snr = [8]; % snr to check
 P = 1; % input power constraint
-N_feedback = 4:1:24;
-delta_snr = 14;
+N_feedback = 8:1:24;
+delta_snr = 4;
 
 delta_theory = [3.25 5.85 8.7];
 

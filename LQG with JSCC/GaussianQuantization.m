@@ -79,6 +79,7 @@ for i=1:length(snr)
         RxSig_linear = x + (1/sqrt(snrLin(i)))*randn(size(x));
         
         % Tuncel
+        x = -10:0.001:10;
         currDistance = abs(x - centers(:));
         [~,minIdx] = min(currDistance,[],1);
         T = codebook(minIdx);
