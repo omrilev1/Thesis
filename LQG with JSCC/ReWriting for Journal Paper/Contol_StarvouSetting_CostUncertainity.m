@@ -45,7 +45,7 @@ for i=1:length(Params.SNR)
             %% plant
             if t==1
                 % initialization - x_{0} = w_{0}
-                xVec = curr_w*ones(Params.NumOfSchemes,1);
+                xVec = 0*ones(Params.NumOfSchemes,1);% curr_w*ones(Params.NumOfSchemes,1);
             elseif t==Params.T
                 % no control in the last stage - evolve state and break
                 xVec = Params.alpha*xVec + curr_w*ones(Params.NumOfSchemes,1) + uVec;
@@ -189,20 +189,30 @@ for i=1:length(Params.SNR)
     for k = [2 3 1]
         currMean = mean(reshape(Results(k,i,:,:),Params.T,[]),2);
         plot(1:(Params.T-1),10*log10(currMean(1:end-1)),lineStyle(k),'LineWidth',2)
+        
+%         if k==2
+%             plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + ((Params.Q + (Params.alpha^2-1)*Params.s_vec(2))/((1+10^(0.45/20)*(1 - Params.rho^2)*Params.snrLin(i))/(1 - Params.rho^2)-Params.alpha^2))*Params.W)*ones(1,Params.T),'--','LineWidth',2)
+%         elseif k==3
+%             plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + ((Params.Q + (Params.alpha^2-1)*Params.s_vec(2))/((1+10^(3.45/20)*((1 - Params.rho^2))*Params.snrLin(i))/(1 - Params.rho^2)-Params.alpha^2))*Params.W)*ones(1,Params.T),'--','LineWidth',2)    
+%         else
+%             plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + ((Params.Q + (Params.alpha^2-1)*Params.s_vec(2))/((1+10^(0.2/20)*Params.snrLin(i))/(1 - Params.rho^2)-Params.alpha^2))*Params.W)*ones(1,Params.T),'--','LineWidth',2)
+%         end
     end
-    % Bound From Toli Paper
-    plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + ((Params.Q + (Params.alpha^2-1)*Params.s_vec(2))/((1+Params.snrLin(i))/(1 - Params.rho^2)-Params.alpha^2))*Params.W)*ones(1,Params.T),'-m','LineWidth',2)
-    plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + ((Params.Q + (Params.alpha^2-1)*Params.s_vec(2))/((1+10^(0.15/20)*(1 - Params.rho^2)*Params.snrLin(i))/(1 - Params.rho^2)-Params.alpha^2))*Params.W)*ones(1,Params.T),'-','LineWidth',2)
-    plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + ((Params.Q + (Params.alpha^2-1)*Params.s_vec(2))/((1+10^(3.05/20)*((1 - Params.rho^2))*Params.snrLin(i))/(1 - Params.rho^2)-Params.alpha^2))*Params.W)*ones(1,Params.T),'-','LineWidth',2)
     
+    % Bound From Toli Paper
+%     plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + ((Params.Q + (Params.alpha^2-1)*Params.s_vec(2))/((1+Params.snrLin(i))/(1 - Params.rho^2)-Params.alpha^2))*Params.W)*ones(1,Params.T),'-m','LineWidth',2)
+%     plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + ((Params.Q + (Params.alpha^2-1)*Params.s_vec(2))/((1+10^(0.15/20)*(1 - Params.rho^2)*Params.snrLin(i))/(1 - Params.rho^2)-Params.alpha^2))*Params.W)*ones(1,Params.T),'-','LineWidth',2)
+%     plot(1:Params.T,10*log10(Params.s_vec(2)*Params.W + ((Params.Q + (Params.alpha^2-1)*Params.s_vec(2))/((1+10^(3.05/20)*((1 - Params.rho^2))*Params.snrLin(i))/(1 - Params.rho^2)-Params.alpha^2))*Params.W)*ones(1,Params.T),'-','LineWidth',2)
+%     
     grid on; grid minor;
     xlabel('t'); ylabel('cost [dB]');
-    legend('Observer is Linear',...
-        strcat('Observer With Tuncel : \alpha = ',num2str(Params.alphaTuncel),' \beta = ',num2str(Params.betaTuncel)),...
-        'SI in Tx and Rx','LQG_{\infty} With Tx and Rx SI','LQG_{\infty} With Rx SI and Linear Encoder','LQG_{\infty} With Rx SI and Modulo Encoder');
-    %         strcat('Linear reversed feedback : ',num2str(Params.N_feedback),' iterations'),'SDR OPTA');
+    legend('Linear With Rx SI',...
+        'Modulo-Based With Rx SI',...
+        'Two-Sided SI');
+%         strcat('Linear reversed feedback : ',num2str(Params.N_feedback),' iterations'),'SDR OPTA');
     
-    title(strcat('SNR = ',num2str(Params.SNR),'[dB], SI noise is \sigma^{2}_z = ',num2str(1)))
+    % title(strcat('SNR = ',num2str(Params.SNR),'[dB], SI noise is \sigma^{2}_z = ',num2str(1/8)))
+    xlim([0 128]);ylim([6 12]);
     powerAnalysis(reshape(Debug(1,i,:,:),Params.T,[]),Params.N_avg,'SI Known to Tx and Rx',sigma_z)
     powerAnalysis(reshape(Debug(2,i,:,:),Params.T,[]),Params.N_avg,'Linear Precoding',sigma_z)
     powerAnalysis(reshape(Debug(3,i,:,:),Params.T,[]),Params.N_avg,'Tuncel',sigma_z)

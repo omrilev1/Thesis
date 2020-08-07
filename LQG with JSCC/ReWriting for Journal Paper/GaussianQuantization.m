@@ -108,6 +108,8 @@ for i=1:length(snr)
         % linear
         RxSig_linear = x + w;
         
+        x = -7:0.001:7;
+        
         % Tuncel
         currDistance = abs(x - centers(:));
         [~,minIdx] = min(currDistance,[],1);

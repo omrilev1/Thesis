@@ -13,7 +13,7 @@ Params.R = 1;                       % LQG Cost parameters
 
 Params.ratio_up = 3;                % Control Cost Uncertainity - upper limit
 Params.ratio_down = 1/3;            % Control Cost Uncertainity - upper limit
-Params.scale = 'worst_case';        % Scaling Method : 'randomized','worst_case'
+Params.scale = 'randomized';        % Scaling Method : 'randomized','worst_case'
 
 % calculate LQG parameters
 [Params.k_vec,Params.s_vec] = calcLQG(Params.Q,Params.R,Params.T,Params.alpha);

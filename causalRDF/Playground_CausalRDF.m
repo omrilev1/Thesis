@@ -4,7 +4,7 @@ t = 1000;
 
 %% lambda = 0
 sigma_v = 1;
-sigma_w = 1/6;
+sigma_w = 0.4843;
 
 d = 0.0001:0.000025:sigma_w^2;
 d_vic = 0.0000125:0.000025:sigma_w^2;
@@ -46,24 +46,18 @@ end
 R_elGamal = sum(tempR,2)/t;
 
 
-% R bound 
-sigma_v_sigma_w = sigma_v^2 * sigma_w^2 / (sigma_v^2 + sigma_w^2);
+%% Bounding the Distortion with BPSK and the Rate by Gaussian variable
 
 figure;hold all
 plot(d,R_noSI,'-.','LineWidth',2)
 plot(d,max(0.5*log(sigma_v^2* (1./d - 1/sigma_w^2)),0),':','LineWidth',2)
 plot(d,R_elGamal,'--','LineWidth',2)
-
-% high rate approx 
-R_highRate = 0.5*log(2*(sigma_v^2/sigma_w^2)./(1 - sqrt(1 - 4*d/sigma_w^2)));
-R_highRate(imag(R_highRate) > 0) = 0;
-plot(d,R_highRate,'--','LineWidth',2)
 plot(d_vic,R_vic,'-','LineWidth',2)
 grid on; grid minor;
 xlabel('Average Distortion [Linear]'); ylabel('Average Rate [bits]');
 % title('Causal Rate Distortion, \lambda = 0');
-legend('Without SI','SI Causally @Rx','SI Causally @Rx - Convexification','HighResolutionBound','Two-Sided SI (Wyner-Ziv)');
-xlim([0 sigma_v_sigma_w]);
+legend('Without SI','SI Causally @Rx','SI Causally @Rx - Convexification','Two-Sided SI (Wyner-Ziv)');
+
 
 figure;hold all
 plot(10*log10(d),R_noSI,'-.','LineWidth',2)
@@ -74,6 +68,19 @@ grid on; grid minor;
 xlabel('Average Distortion [dB]'); ylabel('Average Rate [bits]');
 % title('Causal Rate Distortion, \lambda = 0');
 legend('Without SI','SI Causally @Rx','SI Causally @Rx - Convexification','Two-Sided SI (Wyner-Ziv)');
+
+% Convert to JSCC over AWGN
+figure;hold all
+plot(10*log10(exp(2*R_noSI) - 1),-1*10*log10(d),'-.','LineWidth',2)
+plot(10*log10(exp(2*max(0.5*log(sigma_v^2* (1./d - 1/sigma_w^2)),0)) - 1),-1*10*log10(d),':','LineWidth',2)
+plot(10*log10(exp(2*R_elGamal) - 1),-1*10*log10(d),'--','LineWidth',2)
+plot(10*log10(exp(2*R_vic) - 1),-1*10*log10(d_vic),'-','LineWidth',2)
+grid on; grid minor;
+xlabel('SNR[dB]'); ylabel('SDR [dB]');
+% title('Causal Rate Distortion, \lambda = 0');
+legend('Without SI','SI Causally @Rx','SI Causally @Rx - Convexification','Two-Sided SI (Wyner-Ziv)');
+
+
 
 figure;
 subplot(121);
@@ -175,5 +182,3 @@ grid on; grid minor;
 xlabel('Average Distortion [dB]'); ylabel('Average Rate [bits]');
 % title(strcat('Causal Rate Distortion, \lambda = ',num2str(lambda)));
 ylim([0 3.35]); xlim([-40 10*log10(max(d))])
-
-    

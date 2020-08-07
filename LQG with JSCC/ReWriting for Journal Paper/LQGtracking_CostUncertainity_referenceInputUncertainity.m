@@ -232,12 +232,12 @@ for i=1:length(Params.SNR)
 
     grid on; grid minor;
     xlabel('t'); ylabel('cost [dB]');
-    legend('Observer is Linear',...
-        strcat('Non Linear Mapping [17] : \alpha = ',num2str(Params.alphaTuncel),' \beta = ',num2str(Params.betaTuncel)),...
-        'SI in Tx and Rx');
+    legend('Linear With Rx SI',...
+        'Modulo-Based With Rx SI',...
+        'Two-Sided SI');
     %         strcat('Linear reversed feedback : ',num2str(Params.N_feedback),' iterations'),'SDR OPTA');
-    
-    title(strcat('SNR = ',num2str(Params.SNR),'[dB], ref = ',num2str(ref)))
+    ylim([20 32]); xlim([0 256]);
+    % title(strcat('SNR = ',num2str(Params.SNR),'[dB], ref = ',num2str(ref)))
     powerAnalysis(reshape(Debug(1,i,:,:),Params.T,[]),Params.N_avg,'SI Known to Tx and Rx',sigma_z)
     powerAnalysis(reshape(Debug(2,i,:,:),Params.T,[]),Params.N_avg,'Linear Precoding',sigma_z)
     powerAnalysis(reshape(Debug(3,i,:,:),Params.T,[]),Params.N_avg,'Tuncel',sigma_z)

@@ -1,7 +1,7 @@
 % Simulation of RDF in the low rate regime, using scalar quantizer
 close all; clear all; clc;
 
-Delta = 5 + (0.45:0.25:5.5);
+Delta = (0.15:0.25:5.5);
 sigma_n = 1/4;
 sigma_x_sigma_n = sigma_n^2/(1 + sigma_n^2);
 
@@ -29,9 +29,6 @@ for i=1:length(Delta)
         [~,minIdx] = min(abs(x - grid_quant),[],2);
         minVal = grid_quant(minIdx);minVal = reshape(minVal,[],1);
         
-        if abs(minVal) > 0
-            disp('something');
-        end
         % estimation
         x_y_mmse = y/(1 + sigma_n^2);
         
