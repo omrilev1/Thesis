@@ -8,11 +8,14 @@ close all; clear all; clc;
 Params = initParams();
 
 E_0 = 1;
-optBeta = 3.5;
+optBeta = 0;% -1.63;
 gamma_PPM = 10^(optBeta/10)* Params.snrLin(1);
 
 D_Linear = zeros(length(Params.SNR),1);
 D_PPM = zeros(length(Params.SNR),1);
+D_LinearPrev = zeros(length(Params.SNR),1);
+D_PPMPrev = zeros(length(Params.SNR),1);
+
 currNumOfLevels = 1;finished = 0;
 currE = zeros(1,currNumOfLevels);currE(1) = 1;
 
@@ -24,7 +27,7 @@ for i=1:length(Params.SNR)
     currNumOfLevels = calcNumOfLevels(Params.SNR,i);
     
     if currNumOfLevels==1
-        N_avg = 2^14;
+        N_avg = 2^16;
     else
         N_avg = Params.N_avg;
     end
@@ -35,7 +38,8 @@ for i=1:length(Params.SNR)
     
     % calculate semi-analytical (Wozencraft+Jacobs) PPM MSE, to derive mmse
     % estimation coefficient
-    c_opt = ((144/pi^2) * sqrt(2*pi*gamma_PPM)/(1 + 2*gamma_PPM))^(1/3);
+%     c_opt = ((144/pi^2) * sqrt(2*pi*gamma_PPM)/(2*gamma_PPM))^(1/3);
+    c_opt = ((52*6*sqrt(pi))^(1/3))/(gamma_PPM^(5/6));
     beta = c_opt * exp(gamma_PPM/6);
     W = beta/2;
     
@@ -48,9 +52,12 @@ for i=1:length(Params.SNR)
     end
     tIdx = find(abs(t) <= 0.5);
     
-    ppmPulse = sqrt(2*W)*sin(2*pi*W*t)./(2*pi*W*t);
+%     ppmPulse = sqrt(2*W)*sin(2*pi*W*t)./(2*pi*W*t);
+%     ppmPulse = ppmPulse / sqrt(sum(abs(ppmPulse.^2)*dt));
+    ppmPulse = zeros(size(t));
+    ppmPulse(abs(t) < 1/(2*beta)) = sqrt(beta);
     ppmPulse = ppmPulse / sqrt(sum(abs(ppmPulse.^2)*dt));
-    
+
     Lx = length(ppmPulse);
     Ly = length(ppmPulse)+length(ppmPulse)-1;
     Ly2 = pow2(nextpow2(Ly));
@@ -58,6 +65,10 @@ for i=1:length(Params.SNR)
     
     currDist_Linear = 0;
     currDist_PPM = 0;
+    
+    DistVec_Linear = zeros(1,currNumOfLevels);
+    DistVec_PPM = zeros(1,currNumOfLevels);
+    
     energy = 0;energy_PPM = 0;
     
     dx = 1e-4;
@@ -131,14 +142,32 @@ for i=1:length(Params.SNR)
                 y_linear(1) = sqrt(12) * sqrt(currE(k)) * S + sqrt(1/Params.snrLin(i))*randn;
                 
                 % PPM
-                TxPulse = sqrt(2*W)*sin(2*pi*W*(t - S))./(2*pi*W*(t - S));
-                TxPulse(t == S) = max(ppmPulse);
+%                 TxPulse = sqrt(2*W)*sin(2*pi*W*(t - S))./(2*pi*W*(t - S));
+%                 TxPulse(t == S) = max(ppmPulse);
+%                 TxPulse = TxPulse/sum(abs(TxPulse.^2)*dt);
+                TxPulse = zeros(size(t));
+                TxPulse(abs(t - S) < 1/(2*beta)) = sqrt(beta);
                 TxPulse = TxPulse/sum(abs(TxPulse.^2)*dt);
-                
+        
                 r_ppm = sqrt(currE(k)) * TxPulse + sqrt((1/(2*dt))/Params.snrLin(i))*randn(size(t));
                 
-                % ppm correlator receiver (ML)
-                y_ppm(1) = ppmCorrelator(r_ppm,PPMfreq,tIdx,t,Lx,Ly,Ly2);
+%                 % ppm correlator receiver (ML)
+%                 y_ppm(1) = ppmCorrelator(r_ppm,PPMfreq,tIdx,t,Lx,Ly,Ly2);
+%                 
+                
+                % PPM Correlator receiver
+                PPMcorr = fconv(r_ppm,Lx,Ly,Ly2,PPMfreq);
+                
+                %         PPMcorr2 = conv(r,ppmPulse,'same');
+                PPMcorr = PPMcorr(tIdx);
+                
+                [~,maxIdx] = max(PPMcorr);
+                y_ppm(1) = t(min(tIdx) + maxIdx - 1);
+                if y_ppm(1) > 0.5
+                    y_ppm(1) = 0.5;
+                elseif y_ppm(1) <= -0.5
+                    y_ppm(1) = -0.5;
+                end
                 
             else
                 % Linear
@@ -149,7 +178,20 @@ for i=1:length(Params.SNR)
                 r_ppm = TxPulse + sqrt((1/(2*dt))/Params.snrLin(i))*randn(size(t));
                 
                 % ppm correlator receiver (ML)
-                y_ppm(k) = ppmCorrelator(r_ppm,PPMfreq,tIdx,t,Lx,Ly,Ly2);
+                % y_ppm(k) = ppmCorrelator(r_ppm,PPMfreq,tIdx,t,Lx,Ly,Ly2);
+                                % PPM Correlator receiver
+                PPMcorr = fconv(r_ppm,Lx,Ly,Ly2,PPMfreq);
+                
+                %         PPMcorr2 = conv(r,ppmPulse,'same');
+                PPMcorr = PPMcorr(tIdx);
+                
+                [~,maxIdx] = max(PPMcorr);
+                y_ppm(k) = t(min(tIdx) + maxIdx - 1);
+                if y_ppm(k) > 0.5
+                    y_ppm(k) = 0.5;
+                elseif y_ppm(k) <= -0.5
+                    y_ppm(k) = -0.5;
+                end
                 y_ppm(k) = y_ppm(k) * (2*Params.IntLin(k-1));
             end
             
@@ -166,6 +208,9 @@ for i=1:length(Params.SNR)
                 sHat_PPM = sHat_PPM + (1/etaPPM(k)) * (mod(alphaMMSE_PPM * y_ppm(k) - etaPPM(k)*sHat_PPM + Params.IntLin(k-1),2*Params.IntLin(k-1)) - Params.IntLin(k-1));
                 
             end
+        
+        DistVec_Linear(k) = (sHat_Linear - S)^2 + DistVec_Linear(k);
+        DistVec_PPM(k) = (sHat_PPM - S)^2 + DistVec_PPM(k);   
             
         end
         
@@ -177,6 +222,14 @@ for i=1:length(Params.SNR)
     D_Linear(i) = currDist_Linear/N_avg;
     D_PPM(i) = currDist_PPM/N_avg;
     
+    if k>1
+        D_LinearPrev(i) = DistVec_Linear(end-1)/N_avg;
+        D_PPMPrev(i) = DistVec_PPM(end-1)/N_avg;
+    else
+        D_LinearPrev(i) = D_Linear(i);
+        D_PPMPrev(i) = D_PPM(i);
+    end
+    
     if mod(i,5) == 0
         disp(strcat('Finished SNR = ',num2str(Params.SNR(i))));
     end
@@ -186,12 +239,11 @@ end
 
 figure;hold all
 plot(Params.SNR(1:i),10*log10(1/12./((Params.snrLin(1:i)/Params.snrLin(1)).^2)),'LineWidth',2)
+plot(Params.SNR(1:i),10*log10(1/12./((Params.snrLin(1:i)/Params.snrLin(1)).^3)),'LineWidth',2)
 plot(Params.SNR(1:i),10*log10(D_Linear(1:i)),'-o','LineWidth',2)
-plot(Params.SNR(1:i),10*log10(D_PPM(1:i)),'-*','LineWidth',2)
-grid on; grid minor;
-xlabel('ENR'); ylabel('Distortion [dB]');
-legend('Profile','Linear + MLM','PPM + MLM');
-title(strcat('\beta optimized to ENR + ',num2str(optBeta)));
+plot(Params.SNR(1:i),10*log10(min(D_PPM(1:i),D_Linear(1:i))),'-*','LineWidth',2)
+xlabel('ENR [dB]'); ylabel('Distortion [dB]');
+legend('Profile (L = 2)','Profile (L = 3)','Linear + MLM','PPM + MLM');
 
 
 function [sHat] = ppmCorrelator(r,PPMfreq,tIdx,t,Lx,Ly,Ly2)

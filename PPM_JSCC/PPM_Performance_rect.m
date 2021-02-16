@@ -1,14 +1,15 @@
 %% Analog PPM Performance simulation
 close all; clear all; clc;
 
-ENR = (-3:0.25:18);
+ENR = (-1.5:0.75:17.5);
 ENRlin = 10.^(ENR/10);
 
-ENR_opt = 10;
+ENR_opt = 12.5;
 ENR_opt_lin = 10^(ENR_opt/10);
 
-c_opt = ((144/pi^2) * sqrt(2*pi*ENR_opt_lin)/(1 + 2*ENR_opt_lin))^(1/3);
-beta = c_opt * exp(ENR_opt_lin/6);
+% c_opt = ((144/pi^2) * sqrt(2*pi*ENR_opt_lin)/(1 + 2*ENR_opt_lin))^(1/3);
+c_opt = ((52*sqrt(pi))^(1/3))/(ENR_opt_lin^(5/6));
+beta = 10; c_opt * exp(ENR_opt_lin/6);
 W = beta/2;
 
 dt = 1/(100*beta); Fs = 1/dt;
@@ -17,7 +18,7 @@ tIdx = find(abs(t) <= 0.5);
 
 MSE = zeros(size(ENR));% Mean = zeros(size(ENR));
 
-Nrun = 1e4;
+Nrun = 4*1e4;
 
 ppmPulse = zeros(size(t));
 ppmPulse(abs(t) < 1/(2*beta)) = sqrt(beta);
@@ -32,17 +33,17 @@ PPMfreq = fft(ppmPulse, Ly2);
 Hist = zeros(length(ENR),Nrun);
 TxEnergy = zeros(1,Nrun);
 for i=1:length(ENR)
-    currMSE = 0;
-    %     currMean = 0;
     
-    for n=1:Nrun
+    currMSE = zeros(1,Nrun);
+    currENR = ENRlin(i);
+    parfor n=1:Nrun
         
         % generate source
         S = rand - 0.5;
          
         TxPulse = zeros(size(t));
         TxPulse(abs(t - S) < 1/(2*beta)) = sqrt(beta);
-        TxPulse = sqrt(ENRlin(i))*TxPulse/sum(abs(TxPulse.^2)*dt);
+        TxPulse = sqrt(currENR)*TxPulse/sum(abs(TxPulse.^2)*dt);
         
         noise = randn(size(t));
         noise = sqrt(1/(2*dt))*noise;% sqrt(2*Fs/W)*noise;
@@ -62,28 +63,27 @@ for i=1:length(ENR)
             sHat = -0.5;
         end
         
-        currMSE = currMSE + (S - sHat)^2;
-        Hist(i,n) = S - sHat;
+        currMSE(n) = (S - sHat)^2;
     end
     
-    MSE(i) = currMSE/Nrun;
+    MSE(i) = sum(currMSE)/Nrun;
     
     if mod(i,5) == 0
         disp(strcat('Finished ENR = ',num2str(ENR(i))));
     end
 end
 
-% analytic 2
-deps = 1e-6;
-eps = 0:deps:1;
-upperBound = zeros(size(ENRlin));
-autoCorr = zeros(size(eps));
-autoCorr(eps < 1/(beta)) = 1 - beta*eps(eps < 1/(beta));
-for i=1:length(ENRlin)
-        currNorm = deps*sum(qfunc(sqrt(ENRlin(i) * (1 - autoCorr))));
-    upperBound(i) = 2 * deps * sum((eps.^2).*(1-eps).*qfunc(sqrt(ENRlin(i) * (1 - autoCorr)))/currNorm);
-    
-end
+% % analytic 2
+% deps = 1e-6;
+% eps = 0:deps:1;
+% upperBound = zeros(size(ENRlin));
+% autoCorr = zeros(size(eps));
+% autoCorr(eps < 1/(beta)) = 1 - beta*eps(eps < 1/(beta));
+% for i=1:length(ENRlin)
+%         currNorm = deps*sum(qfunc(sqrt(ENRlin(i) * (1 - autoCorr))));
+%     upperBound(i) = 2 * deps * sum((eps.^2).*(1-eps).*qfunc(sqrt(ENRlin(i) * (1 - autoCorr)))/currNorm);
+%     
+% end
 
 % ZZLB
 deps = 1e-6;
@@ -116,17 +116,18 @@ for i=1:length(ENRlin)
 end
 
 figure;hold all;
-plot(ENR,10*log10((26/16)./((beta*ENRlin).^2) + min(1/6,(beta/24)*(1/(4*sqrt(pi))).*sqrt(ENRlin).*exp(-ENRlin/2).*(1 + sqrt(3/4)*exp(-ENRlin/6)./sqrt(ENRlin) + 4*sqrt(pi./ENRlin)))),':','LineWidth',3);
-% plot(ENR,10*log10(min(1/6,(beta/24)*(1/(4*sqrt(pi))).*sqrt(ENRlin).*exp(-ENRlin/2).*(1 + sqrt(3/4)*exp(-ENRlin/6)./sqrt(ENRlin) + 4*sqrt(pi./ENRlin)))),'LineWidth',3);
-plot(ENR,10*log10(MSE),'-.','LineWidth',3);
-plot(ENR,10*log10(zzlb),'.','LineWidth',3);
-plot(ENR,10*log10(wwb),':','LineWidth',3);
+Pe = (beta/4)*(1/(4*sqrt(pi))).*sqrt(ENRlin).*exp(-ENRlin/2).*(1 + sqrt(3/4)*exp(-ENRlin/6)./sqrt(ENRlin) + 4*sqrt(pi./ENRlin));
+Pe = min(Pe,1);
+plot(ENR,10*log10((1 - Pe).*(26/16)./((beta*(ENRlin)).^2) + (Pe/6)*(1 + 1/beta + 1/beta^2)),'-','LineWidth',2.5);
+plot(ENR,10*log10(MSE),'-o','LineWidth',1.5);
+plot(ENR,10*log10(zzlb),'-*','LineWidth',1.5);
+plot(ENR,10*log10(wwb),'-p','LineWidth',1.5);
 % plot(ENR,10*log10((26/16)./((beta*ENRlin).^2)),'LineWidth',3);
 % plot(ENR,10*log10((1/6)*exp(-ENRlin/2)),'LineWidth',3);
 
-grid on; grid minor;
+% grid on; grid minor;
 xlabel('ENR [dB]'); ylabel('MSE [dB]');
-title(strcat('Estimator MSE, ENR_{opt} = ',num2str(ENR_opt)));
+% title(strcat('Estimator MSE, ENR_{opt} = ',num2str(ENR_opt)));
 legend('Upper Bound','Empiric','ZLLB','WWB');
 % legend('Upper Bound','Empiric','Linear Transmission');
 ylim([min(10*log10(zzlb)) , 0])

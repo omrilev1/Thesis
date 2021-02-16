@@ -16,7 +16,7 @@ Params.etaPPM = [1.2*sqrt(12) 9 10];
 Params.IntLin = [sqrt(12)/2.125 sqrt(12)/2.125 sqrt(12)/2.125];
 
 %% Simulation parameters
-Params.N_avg = 2^16;
+Params.N_avg = 2^17;
 
 
 end
