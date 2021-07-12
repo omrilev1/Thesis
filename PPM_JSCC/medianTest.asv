@@ -1,0 +1,22 @@
+% median check
+
+N = 100;
+iters = 1e4;
+
+medVec = zeros(1,N);
+medVecBound = zeros(1,N);
+for i=1:N
+    currMed = 0; currMedBound = 0;
+
+    xVec = randn(1,i);
+    yVec = ((1:i)/i).^2;
+    
+    medVec(i) = currMed/iters;
+    medVecBound(i) = currMedBound/iters;
+end
+
+figure;hold all;
+plot(N,medVec,'LineWidth',2);
+plot(N,medVecBound,'--','LineWidth',2);
+grid on; grid minor; xlabel('N'); ylabel('Median');
+legend('Median','Sum Of Medians');

@@ -2,9 +2,10 @@
 clear all; clc;
 t = 1000;
 
+rho = 0.95; 
 %% lambda = 0
 sigma_v = 1;
-sigma_w = 1/6;
+sigma_w = sqrt(((1 - rho^2)/(rho^2))*1); % sqrt(((1 - rho^2)/(rho^2))*1)
 
 d = 0.0001:0.000025:sigma_w^2;
 d_vic = 0.0000125:0.000025:sigma_w^2;
@@ -45,63 +46,47 @@ for i=1:(t-1)
 end
 R_elGamal = sum(tempR,2)/t;
 
+% Simulate Tuncel scheme for some SNR points 
+
 
 % R bound 
 sigma_v_sigma_w = sigma_v^2 * sigma_w^2 / (sigma_v^2 + sigma_w^2);
 
-figure;hold all
-plot(d,R_noSI,'-.','LineWidth',2)
-plot(d,max(0.5*log(sigma_v^2* (1./d - 1/sigma_w^2)),0),':','LineWidth',2)
-plot(d,R_elGamal,'--','LineWidth',2)
-
-% high rate approx 
-R_highRate = 0.5*log(2*(sigma_v^2/sigma_w^2)./(1 - sqrt(1 - 4*d/sigma_w^2)));
-R_highRate(imag(R_highRate) > 0) = 0;
-plot(d,R_highRate,'--','LineWidth',2)
-plot(d_vic,R_vic,'-','LineWidth',2)
-grid on; grid minor;
-xlabel('Average Distortion [Linear]'); ylabel('Average Rate [bits]');
-% title('Causal Rate Distortion, \lambda = 0');
-legend('Without SI','SI Causally @Rx','SI Causally @Rx - Convexification','HighResolutionBound','Two-Sided SI (Wyner-Ziv)');
-xlim([0 sigma_v_sigma_w]);
-
-figure;hold all
-plot(10*log10(d),R_noSI,'-.','LineWidth',2)
-plot(10*log10(d),max(0.5*log(sigma_v^2* (1./d - 1/sigma_w^2)),0),':','LineWidth',2)
-plot(10*log10(d),R_elGamal,'--','LineWidth',2)
-plot(10*log10(d_vic),R_vic,'-','LineWidth',2)
-grid on; grid minor;
-xlabel('Average Distortion [dB]'); ylabel('Average Rate [bits]');
-% title('Causal Rate Distortion, \lambda = 0');
-legend('Without SI','SI Causally @Rx','SI Causally @Rx - Convexification','Two-Sided SI (Wyner-Ziv)');
-
 figure;
-subplot(121);
 hold all
-plot(d,R_noSI,'-.','LineWidth',2)
-plot(d,max(0.5*log(sigma_v^2* (1./d - 1/sigma_w^2)),0),':','LineWidth',2)
-plot(d,R_elGamal,'--','LineWidth',2)
-plot(d_vic,R_vic,'-','LineWidth',2)
+plot(d,R_noSI,'-.','LineWidth',3)
+plot(d,max(0.5*log(sigma_v^2* (1./d - 1/sigma_w^2)),0),':','LineWidth',3)
+plot(d,R_elGamal,'--','LineWidth',3)
+plot(d_vic,R_vic,'-','LineWidth',3)
 grid on; grid minor;
-xlabel('Average Distortion [Linear]'); ylabel('Average Rate [bits]');
-% title('Causal Rate Distortion, \lambda = 0');
+xlabel('Average Distortion [Linear]'); ylabel('Average Rate [bits]');title(strcat('\lambda = 0, \sigma_n = ',num2str(sigma_w)));
 legend('Without SI','SI Causally @Rx','SI Causally @Rx - Convexification','Two-Sided SI (Wyner-Ziv)');
 
+
+figure;subplot(121);
+hold all
+plot(d,R_noSI,'-.','LineWidth',3)
+plot(d,max(0.5*log(sigma_v^2* (1./d - 1/sigma_w^2)),0),':','LineWidth',3)
+plot(d,R_elGamal,'--','LineWidth',3)
+plot(d_vic,R_vic,'-','LineWidth',3)
+grid on; grid minor;
+xlabel('Average Distortion [Linear]'); ylabel('Average Rate [bits]');title('\lambda = 0');
+legend('Without SI','SI Causally @Rx','SI Causally @Rx - Convexification','1D Modulo','Two-Sided SI (Wyner-Ziv)');
 
 subplot(122);
-hold all;
-plot(10*log10(d),R_noSI,'-.','LineWidth',2)
-plot(10*log10(d),max(0.5*log(sigma_v^2* (1./d - 1/sigma_w^2)),0),':','LineWidth',2)
-plot(10*log10(d),R_elGamal,'--','LineWidth',2)
-plot(10*log10(d_vic),R_vic,'-','LineWidth',2)
+hold all
+plot(10*log10(d),R_noSI,'-.','LineWidth',3)
+plot(10*log10(d),max(0.5*log(sigma_v^2* (1./d - 1/sigma_w^2)),0),':','LineWidth',3)
+plot(10*log10(d),R_elGamal,'--','LineWidth',3)
+plot(10*log10(d_vic),R_vic,'-','LineWidth',3)
 grid on; grid minor;
-xlabel('Average Distortion [dB]'); ylabel('Average Rate [bits]');
-% title('Causal Rate Distortion, \lambda = 0');
+xlabel('Average Distortion [Linear]'); ylabel('Average Rate [bits]');title('\lambda = 0');
+legend('Without SI','SI Causally @Rx','SI Causally @Rx - Convexification','1D Modulo','Two-Sided SI (Wyner-Ziv)');
 
 %% lambda = arbitrary < 1
 sigma_v = 1;
 lambda = 0.9;
-sigma_w = 1/4;
+sigma_w = sqrt(((1 - rho^2)/(rho^2)));% 1/4;
 
 d = 0.0001:0.000025:sigma_w^2;
 d_vic = 0.0000125:0.000025:sigma_w^2;
@@ -128,52 +113,46 @@ currR = [50 reshape(R_elGamal,1,[])];
 currD = [50 reshape(d,1,[])];
 convHull_Idx = convhull(currD,currR);
 
-figure;hold all
-plot(d,R_noSI,'-.','LineWidth',2)
-plot(d,R_elGamal,':','LineWidth',2)
-plot(currD(convHull_Idx(:).'),currR(convHull_Idx(:).'),'--','LineWidth',2.5)
-plot(d_vic,R_vic,'-','LineWidth',2)
+subplot(122); hold all;
+plot(d,R_noSI,'-.','LineWidth',3)
+plot(d,R_elGamal,':','LineWidth',3)
+plot(currD(convHull_Idx(:).'),currR(convHull_Idx(:).'),'--','LineWidth',3)
+plot(d_vic,R_vic,'-','LineWidth',3)
 grid on; grid minor;
 xlabel('D [Linear]'); ylabel('Rate [bits]');
 title(strcat('Causal Rate Distortion, \lambda = ',num2str(lambda)));
 legend('Without SI','SI Causally @Rx','SI Causally @Rx - Convexification','Two-Sided SI (Wyner-Ziv)');
 ylim([0 3.35]); xlim([0 max(d)])
 
-figure;hold all
-plot(10*log10(d),R_noSI,'-.','LineWidth',2)
-plot(10*log10(d),R_elGamal,':','LineWidth',2)
-plot(10*log10(currD(convHull_Idx(:).')),currR(convHull_Idx(:).'),'--','LineWidth',2.5)
-plot(10*log10(d_vic),R_vic,'-','LineWidth',2)
+
+figure; hold all; 
+plot(d,R_noSI,'-.','LineWidth',3)
+plot(d,R_elGamal,':','LineWidth',3)
+plot(currD(convHull_Idx(:).'),currR(convHull_Idx(:).'),'--','LineWidth',3)
+plot(d_vic,R_vic,'-','LineWidth',3)
 grid on; grid minor;
-xlabel('D [dB]'); ylabel('Rate [bits]');
+xlabel('D [Linear]'); ylabel('Rate [bits]');
 title(strcat('Causal Rate Distortion, \lambda = ',num2str(lambda)));
-legend('Without SI','SI Causally @Rx','SI Causally @Rx - Convexification','Two-Sided SI (Wyner-Ziv)');
-ylim([0 3.35]); xlim([-30 10*log10(max(d))])
-
-
-figure;
-subplot(121); hold all
-plot(d,R_noSI,'-.','LineWidth',2)
-plot(d,R_elGamal,':','LineWidth',2)
-plot(currD(convHull_Idx(:).'),currR(convHull_Idx(:).'),'--','LineWidth',2.5)
-plot(d_vic,R_vic,'-','LineWidth',2)
-grid on; grid minor;
-xlabel('Average Distortion [Linear]'); ylabel('Average Rate [bits]');
-% title(strcat('Causal Rate Distortion, \lambda = ',num2str(lambda)));
-legend('Without SI','SI Causally @Rx','SI Causally @Rx - Convexification','Two-Sided SI (Wyner-Ziv)');
+legend('Without SI','SI Causally @Rx','SI Causally @Rx - Convexification','Non-Linear Scalar Mapping','Two-Sided SI (Wyner-Ziv)');
 ylim([0 3.35]); xlim([0 max(d)])
 
 
+figure;subplot(121);
+hold all
+plot(d,R_noSI,'-.','LineWidth',3)
+plot(d,max(0.5*log(sigma_v^2* (1./d - 1/sigma_w^2)),0),':','LineWidth',3)
+plot(d,R_elGamal,'--','LineWidth',3)
+plot(d_vic,R_vic,'-','LineWidth',3)
+grid on; grid minor;
+xlabel('Average Distortion [Linear]'); ylabel('Average Rate [bits]');title('\lambda = 0.9');
+legend('Without SI','SI Causally @Rx','SI Causally @Rx - Convexification','Two-Sided SI (Wyner-Ziv)');
 
 subplot(122);
-hold all;
-plot(10*log10(d),R_noSI,'-.','LineWidth',2)
-plot(10*log10(d),R_elGamal,':','LineWidth',2)
-plot(10*log10(currD(convHull_Idx(:).')),currR(convHull_Idx(:).'),'--','LineWidth',2.5)
-plot(10*log10(d_vic),R_vic,'-','LineWidth',2)
+hold all
+plot(10*log10(d),R_noSI,'-.','LineWidth',3)
+plot(10*log10(d),max(0.5*log(sigma_v^2* (1./d - 1/sigma_w^2)),0),':','LineWidth',3)
+plot(10*log10(d),R_elGamal,'--','LineWidth',3)
+plot(10*log10(d_vic),R_vic,'-','LineWidth',3)
 grid on; grid minor;
-xlabel('Average Distortion [dB]'); ylabel('Average Rate [bits]');
-% title(strcat('Causal Rate Distortion, \lambda = ',num2str(lambda)));
-ylim([0 3.35]); xlim([-40 10*log10(max(d))])
-
-    
+xlabel('Average Distortion [dB]'); ylabel('Average Rate [bits]');title('\lambda = 0.9');
+legend('Without SI','SI Causally @Rx','SI Causally @Rx - Convexification','Two-Sided SI (Wyner-Ziv)');

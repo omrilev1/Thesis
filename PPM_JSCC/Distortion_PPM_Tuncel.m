@@ -3,7 +3,7 @@
 
 % Infinite BW JSCC schemes
 
-ENR_min = 15;
+ENR_min = 12.5;
 ENR_min_lin = 10^(ENR_min/10);
 ENR = -3:0.25:22;
 ENR_lin = 10.^(ENR/10);
