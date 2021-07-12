@@ -1,7 +1,7 @@
 %% Analog PPM Performance simulation
-clear ; clc;
+clear ; clc; close all
 
-ENR = (0:1:22);
+ENR = (-1:1:22);
 ENRlin = 10.^(ENR/10);
 
 ENR_opt = 12;
@@ -9,6 +9,7 @@ ENR_opt_lin = 10^(ENR_opt/10);
 
 c_opt = ((13*sqrt(pi)/(4*sqrt(15)))^(1/3))/(ENR_opt_lin^(5/6));
 beta = 10; 2*c_opt * exp(ENR_opt_lin/6);
+
 W = beta/2;
 
 dt = 1/(200*beta); Fs = 1/dt;
@@ -19,7 +20,7 @@ t = -overload:dt:overload;
 MSE_MAP = zeros(size(ENR));% Mean = zeros(size(ENR));
 LargeErrMSE = zeros(size(ENR));
 ProbOfLargeErr = zeros(size(ENR));
-Nrun =  4*1e4;
+Nrun =  1e4;
 
 ppmPulse = zeros(size(t));
 ppmPulse(abs(t) < 1/(2*beta)) = sqrt(beta);
@@ -108,9 +109,13 @@ wwb = zeros(size(ENRlin));optH = zeros(size(ENRlin));
 for i=1:length(ENRlin)
     J = zeros(size(eps));
     autoCorr = zeros(size(eps)); autoCorr(eps < 1/(beta)) = 1 - beta*eps(eps < 1/(beta));
-    autoCorr2 = zeros(size(eps)); autoCorr2(eps < 1/(beta/2)) = 1 - (beta/2)*eps(eps < 1/(beta/2));
+    autoCorr2 = zeros(size(eps)); autoCorr2(eps < 1/(2*beta)) = 1 - (2*beta)*eps(eps < 1/(2*beta));
+    J = (0.5*(eps.^2).*(exp(-0.25*eps.^2)).*exp(-0.5*ENRlin(i)*(1 - autoCorr)))./(exp(-0.125*eps.^2) - exp(-0.125*(2*eps).^2).*exp(-0.25*ENRlin(i)*(1 - autoCorr2)));
     
-    J = (0.25*(eps.^2).*(exp(-0.25*eps.^2)).*exp(-0.5*ENRlin(i)*(1 - autoCorr)))./(exp(-0.125*eps.^2) - exp(-0.125*(2*eps).^2).*exp(-0.25*ENRlin(i)*(1 - autoCorr2)));
+%     autoCorr = zeros(size(eps)); autoCorr(eps < 1/(beta)) = 1 - beta*eps(eps < 1/(beta));
+%     autoCorr2 = zeros(size(eps)); autoCorr2(eps < 1/(beta/2)) = 1 - (beta/2)*eps(eps < 1/(beta/2));
+    
+%     J = (0.25*(eps.^2).*(exp(-0.25*eps.^2)).*exp(-0.5*ENRlin(i)*(1 - autoCorr)))./(exp(-0.125*eps.^2) - exp(-0.125*(2*eps).^2).*exp(-0.25*ENRlin(i)*(1 - autoCorr2)));
 
     [wwb(i),minIdx] = max(J);
     optH(i) = eps(minIdx);
