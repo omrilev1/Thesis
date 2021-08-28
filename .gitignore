@@ -7,3 +7,13 @@ LQG with JSCC/Q1_R0_controlCost.jpg
 LQG with JSCC/Q1_R1_controlCost.jpg
 LQG with JSCC/Q1_R1_controlCost_10dB.jpg
 LQG with JSCC/Q1_R2_controlCost.jpg
+PPM_JSCC/fast_linear_interpolation/uTest_ScaleTime.m
+PPM_JSCC/fast_linear_interpolation/InstallMex.m
+PPM_JSCC/fast_linear_interpolation/license.txt
+PPM_JSCC/fast_linear_interpolation/ScaleTime.c
+PPM_JSCC/fast_linear_interpolation/ScaleTime.m
+PPM_JSCC/fast_linear_interpolation/ScaleTime.mexw64
+PPM_JSCC/fast_linear_interpolation/ScaleTimeNU.m
+PPM_JSCC/golden_section_method/f.m
+PPM_JSCC/golden_section_method/golden.m
+PPM_JSCC/replay_pid12428.log

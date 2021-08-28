@@ -7,7 +7,7 @@ profileOrder = 2;
 saveResults = 1;
 
 % Init parameters and arrays structures
-SNR = -7:0.25:35;  % 8              % Direct channel SNR
+SNR = -7:0.25:30;  % 8              % Direct channel SNR
 snrLin = 10.^(SNR/10);
 
 profile = 1./(1 + (snrLin).^profileOrder);

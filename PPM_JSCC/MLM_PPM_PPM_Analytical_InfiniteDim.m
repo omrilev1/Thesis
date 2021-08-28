@@ -7,7 +7,7 @@ profileOrder = 2;
 saveResults = 1;
 
 % Init parameters and arrays structures
-SNR = -7:0.25:35;  % 8              % Direct channel SNR
+SNR = -7:0.25:30;  % 8              % Direct channel SNR
 snrLin = 10.^(SNR/10);
 profile = 1./(1 + (snrLin).^profileOrder);
 
@@ -17,13 +17,12 @@ maxStages = 20; % number of PPM levels
 
 %% Modulo parameters:
 
-% Delta = 0.85; alpha = 0.535;
-% M = 5;
-% energyAlloc = ones(1,M + 1) .* Delta .* exp(-(0:1:(M)) * alpha);
-
-Delta = 0.85; alpha = 0.5;
-M = 4;
+% Delta = 0.85; alpha = 0.55;
+% M = 6;
+Delta = 0.848; alpha = 0.55;
+M = 6;
 energyAlloc = ones(1,M + 1) .* Delta .* exp(-(0:1:(M)) * alpha);
+
 disp(strcat('Total Energy = ',num2str(sum(energyAlloc))))
 %% Simulation parameters
 
@@ -52,9 +51,9 @@ for i=1:length(SNR)
         
         if currNumOfLevels > M
             % calculate optimal ppm beta and generate ppm pulse
-            beta = 0.85;
+            beta = 0.9;
             EN0_Start = energyAlloc(currNumOfLevels)*snrLin(i);
-            D_S = ((13/8) + 2 * (sqrt(2*beta*EN0_Start) - 1)*exp(-EN0_Start * (1 - 1/sqrt(2*beta*EN0_Start))^2)) / ((sqrt(beta*EN0_Start) - 1/sqrt(2))^4) ...
+            D_S = ((13/8) + sqrt(2/beta) * (sqrt(2*beta*EN0_Start) - 1)*exp(-EN0_Start * (1 - 1/sqrt(2*beta*EN0_Start))^2)) / ((sqrt(beta*EN0_Start) - 1/sqrt(2))^4) ...
                 + exp(-beta*EN0_Start)/beta^2;
             D_L = 2*beta*sqrt(EN0_Start)*exp(-EN0_Start/2) * (1 + 3*sqrt(2*pi/EN0_Start) + 12*exp(-1)/(beta*sqrt(EN0_Start)) ...
                 + 8*exp(-1)/(sqrt(8*pi)*beta) + sqrt(8/(pi*EN0_Start)) + 12^(3/2) * exp(-3/2) /(beta*sqrt(32*pi*EN0_Start)));
@@ -70,7 +69,7 @@ for i=1:length(SNR)
         if currNumOfLevels > M
             % substitute PPM SDR Upper bound for current ENR
             EN0 = energyAlloc(2)*snrLin(i);
-            D_S = ((13/8) + 2 * (sqrt(2*beta*EN0) - 1)*exp(-EN0 * (1 - 1/sqrt(2*beta*EN0))^2)) / ((sqrt(beta*EN0) - 1/sqrt(2))^4) ...
+            D_S = ((13/8) + sqrt(2/beta) * (sqrt(2*beta*EN0) - 1)*exp(-EN0 * (1 - 1/sqrt(2*beta*EN0))^2)) / ((sqrt(beta*EN0) - 1/sqrt(2))^4) ...
                 + exp(-beta*EN0)/beta^2;
             D_L = 2*beta*sqrt(EN0)*exp(-EN0/2) * (1 + 3*sqrt(2*pi/EN0) + 12*exp(-1)/(beta*sqrt(EN0)) ...
                 + 8*exp(-1)/(sqrt(8*pi)*beta) + sqrt(8/(pi*EN0)) + 12^(3/2) * exp(-3/2) /(beta*sqrt(32*pi*EN0)));

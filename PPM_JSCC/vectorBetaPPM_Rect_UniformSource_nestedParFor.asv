@@ -14,7 +14,7 @@ for i=1:length(ENR)
     beta = max(1,beta_opt*(0.2:(1/64):1.25));
     MSE = zeros(size(beta));
     currENRlin = ENRlin(i);
-    for beta_idx = 1:length(beta)
+    parfor beta_idx = 1:length(beta)
         curr_beta = beta(beta_idx);
         currMSE = calc_perf_uniform_ppm(curr_beta,Nrun,currENRlin);
         MSE(beta_idx) = currMSE;
@@ -46,9 +46,6 @@ for i=1:length(ENR)
         (1/6)*(1 + 2./beta_vec + (2./beta_vec).^2) .* P_t .* (1 + 4 * sqrt(pi./ENRlin(i)) + sqrt(3/4) * exp(-1*ENRlin(i)/6)./sqrt(ENRlin(i))));
     opt_beta(i) = beta_vec(optIdx);
 end
-
-save('UniformOptSDR.mat','ENR','final_MSE','optSDR_Analytic_Exact','final_Beta','opt_beta');
-
 
 figure;subplot(211);
 hold all;
@@ -99,9 +96,8 @@ grid on; grid minor;
 figure;subplot(211);
 hold all;
 plot(ENR,10*log10(1/12./final_MSE),'-.ko','LineWidth',1.5);
-plot(ENR,10*log10(1/12./D_Tuncel),'--bd','LineWidth',1.5);
 plot(ENR,10*log10(1/12./optSDR_Analytic_Exact),'--ms','LineWidth',1.5);
-xlabel('ENR [dB]'); ylabel('SDR [dB]'); legend({'Empirical','Tuncel High ENR Approx','Lower Bound'},'Location','northwest','FontSize',12);
+xlabel('ENR [dB]'); ylabel('SDR [dB]'); legend({'Empirical','Lower Bound'},'Location','northwest','FontSize',12);
 grid on; grid minor;
 subplot(212);
 semilogy(ENR,final_Beta,'-.ko','LineWidth',1.5);hold on;

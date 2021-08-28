@@ -7,7 +7,7 @@ profileOrder = 2;
 saveResults = 1;
 
 % Init parameters and arrays structures
-SNR = -7:0.25:20;  % 8              % Direct channel SNR
+SNR = -7:0.25:30;  % 8              % Direct channel SNR
 snrLin = 10.^(SNR/10);
 profile = 1./(1 + (snrLin).^profileOrder);
 
@@ -108,10 +108,10 @@ function [SDR_PPM,CorrCoeff,PowerCoeff] = simulateGaussianPPM(beta,SNRlin)
 
 dt = 1/(325*beta);
 
-overload = 6.75;
+overload = 6.5;
 t = -overload:dt:overload;
 
-Nrun =  1e4;
+Nrun =  2*1e4;
 
 ppmPulse = zeros(size(t));
 ppmPulse(abs(t) < 1/(2*beta)) = sqrt(beta);
